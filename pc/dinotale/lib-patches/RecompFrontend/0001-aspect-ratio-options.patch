@@ -1,0 +1,162 @@
+diff --git a/recompui/include/recompui/config.h b/recompui/include/recompui/config.h
+index 38b84f5..f49ebc8 100644
+--- a/recompui/include/recompui/config.h
++++ b/recompui/include/recompui/config.h
+@@ -65,6 +65,10 @@ namespace recompui {
+     
+             void update_msaa_supported(bool supported);
+             void update_refresh_rate(uint32_t refresh_rate);
++            // DinoTale: whether the Expand aspect ratio can be chosen right now. Safe to call from any
++            // thread; the menu applies it on the UI thread (apply_pending_updates).
++            void set_expand_available(bool available);
++            void apply_pending_updates();
+             void toggle_fullscreen();
+         }
+ 
+diff --git a/recompui/src/config/ui_config_page_options_menu.cpp b/recompui/src/config/ui_config_page_options_menu.cpp
+index 6ba64e2..64f72c0 100644
+--- a/recompui/src/config/ui_config_page_options_menu.cpp
++++ b/recompui/src/config/ui_config_page_options_menu.cpp
+@@ -1,4 +1,5 @@
+ #include "ui_config_page_options_menu.h"
++#include "recompui/config.h"
+ 
+ 
+ namespace recompui {
+@@ -50,6 +51,7 @@ ConfigOptionElement* ConfigPageOptionsMenu::get_element_from_option_id(const std
+ void ConfigPageOptionsMenu::perform_option_render_updates() {
+     using ConfigOptionUpdateType = recomp::config::ConfigOptionUpdateType;
+     queue_update();
++    recompui::config::graphics::apply_pending_updates();
+ 
+     auto options_updates = config->get_config_option_updates();
+     bool has_updates = !options_updates.empty();
+diff --git a/recompui/src/config/ui_config_tab_graphics.cpp b/recompui/src/config/ui_config_tab_graphics.cpp
+index 4fdf81f..9703ca4 100644
+--- a/recompui/src/config/ui_config_tab_graphics.cpp
++++ b/recompui/src/config/ui_config_tab_graphics.cpp
+@@ -1,3 +1,5 @@
++#include <atomic>
++
+ #include "librecomp/config.hpp"
+ #include "recompui/config.h"
+ #include "recompui/renderer.h"
+@@ -66,6 +68,8 @@ namespace recompui {
+ 
+         static EnumOptionVector aspect_ratio_options = {
+             {ultramodern::renderer::AspectRatio::Original, "Original"},
++            {ultramodern::renderer::AspectRatio::Stretch, "Stretch"},
++            {ultramodern::renderer::AspectRatio::Hybrid, "Hybrid"},
+             {ultramodern::renderer::AspectRatio::Expand, "Expand"},
+             // {ultramodern::renderer::AspectRatio::Manual, "Manual"},
+         };
+@@ -151,6 +155,21 @@ namespace recompui {
+             get_graphics_config().update_option_enum_details(graphics::options::ds_option, get_downsampling_details(res_option, ds_opt));
+         }
+ 
++        static std::string get_aspect_ratio_text(bool expand_available) {
++            std::string text =
++                "Sets the horizontal aspect ratio. <recomp-color primary>Original</recomp-color> uses the game's original 4:3 aspect ratio. "
++                "<recomp-color primary>Stretch</recomp-color> stretches the original picture to fill the window. "
++                "<recomp-color primary>Hybrid</recomp-color> (experimental) stretches the backgrounds to fill the window and keeps the sprites' shape; objects only show in the middle 4:3 area, so the sides are dimmed. "
++                "<recomp-color primary>Expand</recomp-color> (experimental) shows more of each level.";
++            if (!expand_available) {
++                text +=
++                    "<br />"
++                    "<br />"
++                    "<recomp-color primary>Expand can only be turned on outside a level.</recomp-color> Quit to the menu or course select to choose it.";
++            }
++            return text;
++        }
++
+         static std::string get_framerate_text(uint32_t refresh_rate) {
+             return
+                 "Sets the game's output framerate. This option does not affect gameplay."
+@@ -202,6 +221,30 @@ namespace recompui {
+             }
+         }
+ 
++        static std::atomic<int> pending_expand_available{ -1 };
++        static int applied_expand_available = 1;
++
++        void graphics::set_expand_available(bool available) {
++            pending_expand_available.store(available ? 1 : 0);
++        }
++
++        void graphics::apply_pending_updates() {
++            const int pending = pending_expand_available.exchange(-1);
++            if ((pending < 0) || (pending == applied_expand_available)) {
++                return;
++            }
++
++            applied_expand_available = pending;
++            recomp::config::Config &config = get_graphics_config();
++            // Enum choices are disabled by their position in the list, not their value.
++            for (uint32_t i = 0; i < aspect_ratio_options.size(); i++) {
++                if (aspect_ratio_options[i].value == static_cast<uint32_t>(ultramodern::renderer::AspectRatio::Expand)) {
++                    config.update_enum_option_disabled(graphics::options::ar_option, i, pending == 0);
++                }
++            }
++            config.update_option_description(graphics::options::ar_option, get_aspect_ratio_text(pending != 0));
++        }
++
+         void graphics::update_refresh_rate(uint32_t refresh_rate) {
+             recomp::config::Config& config = get_graphics_config();
+             std::string framerate_text = get_framerate_text(refresh_rate);
+@@ -235,7 +278,10 @@ namespace recompui {
+             config.add_enum_option(
+                 graphics::options::res_option,
+                 "Resolution",
+-                "Sets the output resolution of the game. <recomp-color primary>Original</recomp-color> matches the game's original 240p resolution. <recomp-color primary>Original 2x</recomp-color> will render at 480p. <recomp-color primary>Auto</recomp-color> will scale based on the game window's resolution.",
++                "Sets the resolution the game is rendered at. "
++                "<recomp-color primary>Original</recomp-color>: 240p, the N64's own resolution. "
++                "<recomp-color primary>Original 2x</recomp-color>: 480p. "
++                "<recomp-color primary>Auto</recomp-color>: the window's own resolution, so 720p, 1080p, 1440p or 4K in a fullscreen window on a screen of that size.",
+                 resolution_options,
+                 ultramodern::renderer::Resolution::Auto
+             );
+@@ -286,9 +332,9 @@ namespace recompui {
+             config.add_enum_option(
+                 graphics::options::ar_option,
+                 "Aspect Ratio",
+-                "Sets the horizontal aspect ratio. <recomp-color primary>Original</recomp-color> uses the game's original 4:3 aspect ratio. <recomp-color primary>Expand</recomp-color> will adjust to match the game window's aspect ratio.",
++                get_aspect_ratio_text(true),
+                 aspect_ratio_options,
+-                ultramodern::renderer::AspectRatio::Expand
++                ultramodern::renderer::AspectRatio::Original
+             );
+ 
+             config.add_enum_option(
+diff --git a/recompui/src/renderer/rt64_render_context.cpp b/recompui/src/renderer/rt64_render_context.cpp
+index a7954c7..c938e02 100644
+--- a/recompui/src/renderer/rt64_render_context.cpp
++++ b/recompui/src/renderer/rt64_render_context.cpp
+@@ -81,6 +81,12 @@ RT64::UserConfiguration::AspectRatio to_rt64(ultramodern::renderer::AspectRatio
+             return RT64::UserConfiguration::AspectRatio::Expand;
+         case ultramodern::renderer::AspectRatio::Manual:
+             return RT64::UserConfiguration::AspectRatio::Manual;
++        case ultramodern::renderer::AspectRatio::Stretch:
++            // Rendered at the original aspect ratio, then stretched to the window (stretchToWindow).
++            return RT64::UserConfiguration::AspectRatio::Original;
++        case ultramodern::renderer::AspectRatio::Hybrid:
++            // Widened to the window, with the backgrounds stretched (stretchBackgrounds).
++            return RT64::UserConfiguration::AspectRatio::Expand;
+         case ultramodern::renderer::AspectRatio::OptionCount:
+             return RT64::UserConfiguration::AspectRatio::OptionCount;
+     }
+@@ -172,6 +178,15 @@ void set_application_user_config(RT64::Application* application, const ultramode
+     }
+ 
+     application->userConfig.aspectRatio = to_rt64(config.ar_option);
++    application->userConfig.stretchToWindow = (config.ar_option == ultramodern::renderer::AspectRatio::Stretch);
++    application->userConfig.stretchBackgrounds = (config.ar_option == ultramodern::renderer::AspectRatio::Hybrid);
++    // Expand: true widescreen. The game is patched to draw a wider view (see the DinoTale hooks).
++    application->userConfig.extendScreen = (config.ar_option == ultramodern::renderer::AspectRatio::Expand);
++    if (application->userConfig.extendScreen) {
++        // The widened scissor is anchored to the window edges with extended-GBI origins, which only
++        // reach the edges when the extended aspect is the whole window.
++        application->userConfig.extAspectRatio = RT64::UserConfiguration::AspectRatio::Expand;
++    }
+     application->userConfig.antialiasing = to_rt64(config.msaa_option);
+     application->userConfig.refreshRate = to_rt64(config.rr_option);
+     application->userConfig.refreshRateTarget = config.rr_manual_value;

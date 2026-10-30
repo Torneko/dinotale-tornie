@@ -1,0 +1,16 @@
+{
+  "repository": "https://github.com/wootbeer/dinotale",
+  "commit": "65060b54925016f634b4e0e327878f72051cd4a9",
+  "submodules": {
+    "lib/N64ModernRuntime": "cdf5abbd5026fef5c364c676e4667c45e42b6863",
+    "lib/RecompFrontend": "b1a1477c6556aeb7ed45defbfb5924f721efebc1",
+    "lib/rt64": "43373749dac9bbc1b653e6a02aed40a9e1783bed"
+  },
+  "localTrackedChanges": [
+    "CMakeLists.txt",
+    "include/dt_recomp_hooks.h",
+    "src/main/crash_handler.cpp",
+    "src/main/main.cpp",
+    "src/main/register_overlays.cpp"
+  ]
+}

@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+pc/build/
+pc/profiles/
+pc/content/
+*.z64
+*.v64
+*.n64
+*.eep
+*.dmp
+*.rdram
+*.bak
+workshop-content.bin
+**/RecompiledFuncs/
+.env*

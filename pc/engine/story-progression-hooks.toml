@@ -1,0 +1,109 @@
+# Replace the native four-choice menu after its title Start transition.
+[[patches.hook]]
+func = "func_80450AD0"
+before_vram = 0x80450AD0
+text = "if(workshop_menu_title(rdram,ctx))return;"
+
+[[patches.hook]]
+func = "workshop_ys_ext_valid"
+before_vram = 0x807F283C
+text = "ctx->r2=workshop_progress_valid(rdram,ctx); return;"
+
+# Sixth hybrid: all 24 Trial courses accessible through Story is enough.
+# Preserve native validation, stored draws, stack handling and egg gates.
+[[patches.hook]]
+func = "workshop_ys_ext_unlocked_mask"
+before_vram = 0x807F2A64
+text = "if(workshop_progress_trial_access(rdram))ctx->r13=0xFFFFFF;"
+
+[[patches.hook]]
+func = "workshop_ys_ext_complete_trial"
+before_vram = 0x807F2D9C
+text = "if(workshop_progress_trial(rdram,ctx)) return;"
+
+[[patches.hook]]
+func = "workshop_ext_eeprom_read"
+before_vram = 0x807F3DA8
+text = "workshop_progress_read_begin(rdram,ctx);"
+
+[[patches.hook]]
+func = "workshop_ext_eeprom_read"
+before_vram = 0x807F3F64
+text = "workshop_progress_read_end(rdram,ctx);"
+
+[[patches.hook]]
+func = "func_800697F0"
+before_vram = 0x80069870
+text = "workshop_progress_boot(rdram,ctx);"
+
+[[patches.hook]]
+func = "workshop_ext_eeprom_write"
+before_vram = 0x807F3C90
+text = "workshop_progress_reconcile(rdram,ctx);"
+
+# Include eggs and automatic hybrid rewards earned at this same finish.
+# Keep the native score storage, animation and later save order intact.
+[[patches.hook]]
+func = "func_800409F0"
+before_vram = 0x80040A2C
+text = "workshop_end_score_lives(rdram,ctx);"
+
+# Objectives still draw their original colors; only found colors join the team.
+[[patches.hook]]
+func = "workshop_ext_unlocked"
+before_vram = 0x807F3980
+text = "ctx->r2=workshop_find_unlocked(rdram);return;"
+
+[[patches.hook]]
+func = "workshop_ys_ext_trial_color_unlocked"
+before_vram = 0x807F2FB8
+text = "if(ctx->r5>=8 && ctx->r5<14)ctx->r2=ctx->r2 && (workshop_find_unlocked(rdram)&(1u<<(ctx->r5-8)));"
+
+[[patches.hook]]
+func = "func_8003B540"
+before_vram = 0x8003B5A0
+text = "workshop_find_egg_state(rdram,ctx);"
+
+[[patches.hook]]
+func = "workshop_807F1100"
+before_vram = 0x807F1100
+text = "workshop_find_reset();"
+
+[[patches.hook]]
+func = "workshop_ext_clear_all"
+before_vram = 0x807F3F6C
+text = "workshop_find_clear();"
+
+# The other native White Shy Guy sources are concealed in item containers.
+[[patches.hook]]
+func = "workshop_8059F2C0"
+before_vram = 0x8059F2C0
+text = "if(workshop_find_release(rdram,ctx))return;"
+
+# Retain their reveal/interaction, replacing only their White Shy Guy reward.
+[[patches.hook]]
+func = "func_806F616C"
+before_vram = 0x806F6184
+text = "workshop_find_container_gate(rdram,ctx);"
+[[patches.hook]]
+func = "func_8079AC9C"
+before_vram = 0x8079AD44
+text = "workshop_find_container_gate(rdram,ctx);"
+[[patches.hook]]
+func = "func_80799F20"
+before_vram = 0x80799F20
+text = "if(workshop_find_hidden(rdram,ctx,ctx->r4))return;"
+[[patches.hook]]
+func = "func_806F55E8"
+before_vram = 0x806F58E0
+text = "if(workshop_find_hidden(rdram,ctx,ctx->r20))ctx->r2=0;"
+
+[[patches.hook]]
+func = "workshop_ext_fresh_trial"
+before_vram = 0x807F3A08
+text = "workshop_find_reset();"
+
+[[patches.hook]]
+func = "workshop_807F1800"
+before_vram = 0x807F1800
+text = "workshop_find_reset();"

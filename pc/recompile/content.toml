@@ -1,0 +1,826 @@
+# N64Recomp config for Yoshi's Story (USA, En/Ja).
+# See STATUS.md for how each part was derived.
+
+[input]
+entrypoint = 0x80000400
+output_func_path = "RecompiledFuncs"
+rom_file_path = "content.z64"
+symbols_file_path = "content.syms.toml"
+
+[patches]
+stubs = []
+ignored = ["workshop_80000438", "workshop_807F1600"]
+
+# Overlays: tell the runtime where the game put each one. Overlay_Load
+# (vromStart, vromEnd, vramStart, vramEnd, allocatedRamAddr) DMAs a
+# relocatable overlay into RAM and relocates it. The recompiled code for that
+# overlay reaches its own functions and data through the section's load
+# address, so register it here, at the top of Overlay_Load, and drop
+# whatever was registered in that RAM before (STATUS.md round 2).
+[[patches.hook]]
+func = "Overlay_Load"
+before_vram = 0x8008169C
+text = "unload_overlays((int32_t)MEM_W(0x10, ctx->r29), (uint32_t)(ctx->r7 - ctx->r6)); load_overlays((uint32_t)ctx->r4, (int32_t)MEM_W(0x10, ctx->r29), (uint32_t)(ctx->r5 - ctx->r4));"
+
+# Frontend UI pump: recompui's queued per-frame UI callbacks run on the game
+# thread. Hooked just before the game's only osViSwapBuffer call, in
+# func_80071974 (the framebuffer swap loop), which runs once per presented
+# frame. Both paths into 0x80071A18 pass through the hook. The pump may use
+# a0-a2 and the stack (restored before it returns), so they're saved here;
+# at this point only s-registers are live and a0 is set in the jal's delay
+# slot.
+[[patches.hook]]
+func = "func_80071974"
+before_vram = 0x80071A18
+text = "{ gpr a0 = ctx->r4, a1 = ctx->r5, a2 = ctx->r6; recomp_run_ui_callbacks(rdram, ctx); ctx->r4 = a0; ctx->r5 = a1; ctx->r6 = a2; }"
+
+# Loads into $zero (`lw $zero, off(reg)`): a read whose result is thrown
+# away, which N64Recomp emits as the invalid C `0 = MEM_W(...)`. With no
+# cache or bus side effects to preserve here, they become nops.
+[[patches.instruction]]
+func = "func_80071FF0"
+vram = 0x80072040
+value = 0x00000000
+
+[[patches.instruction]]
+func = "func_8007C1A0"
+vram = 0x8007C2BC
+value = 0x00000000
+
+[[patches.instruction]]
+func = "func_8007C1A0"
+vram = 0x8007C2D0
+value = 0x00000000
+
+[[patches.instruction]]
+func = "func_8007C1A0"
+vram = 0x8007C2DC
+value = 0x00000000
+
+# Boot-state checks (STATUS.md round 3). The game reads several things only a
+# real console leaves behind after boot and keeps a flag for each; a failed
+# check quietly breaks the game later (e.g. func_800461F4's callback becomes
+# a stub that returns 0). Each one is answered with what an original
+# cartridge on real hardware gives:
+#  - Idle_ThreadEntry reads the first words of SP IMEM and DMEM (0xA4001000,
+#    0xA4000000), expected to be 0x17D8 and 0xFFFFFFFF. The two loads become
+#    immediates.
+#  - func_8005D420 and func_800687B8 read uncached RDRAM 0xA00002B8 and
+#    0xA0000164 (left by the boot code), and func_800687B8 also checks
+#    osCicId (0x80000310). Their `lui 0xA000` become `lui 0x8000` (the same
+#    memory, cached) and the hook below seeds the three words.
+#  - func_8006F500 reads two words of the cartridge's boot code directly
+#    over the PI bus (ROM 0x458 and 0x45C, low halves). It's replaced by a
+#    hook that stores the same result, 0x0260BCD5, which func_80064AD4
+#    compares against.
+# The same hook tells the crash handler where N64 memory is.
+[[patches.hook]]
+func = "Idle_ThreadEntry"
+before_vram = 0x80067284
+text = "dinotale_crash_note_rdram(rdram); MEM_W(0, (gpr)(int32_t)0x80000164) = 0x01EC6021; MEM_W(0, (gpr)(int32_t)0x800002B8) = 0x8941680C; MEM_W(0, (gpr)(int32_t)0x80000310) = 0x17D8;"
+
+[[patches.instruction]]
+func = "Idle_ThreadEntry"
+vram = 0x80067334
+value = 0x340917D8 # ori $t1, $zero, 0x17D8
+
+[[patches.instruction]]
+func = "Idle_ThreadEntry"
+vram = 0x80067344
+value = 0x240BFFFF # addiu $t3, $zero, -1
+
+[[patches.instruction]]
+func = "func_8005D420"
+vram = 0x8005D444
+value = 0x3C0E8000 # lui $t6, 0x8000
+
+[[patches.instruction]]
+func = "func_800687B8"
+vram = 0x800687DC
+value = 0x3C188000 # lui $t8, 0x8000
+
+[[patches.hook]]
+func = "func_8006F500"
+before_vram = 0x8006F500
+text = "MEM_W(0, (gpr)(int32_t)0x80108620) = 0x0260BCD5; return;"
+
+# func_8000AD10 is the game's own copy of osAiSetNextBuffer(buf, size),
+# writing the audio interface registers directly (with libultra's
+# 8 KB-boundary workaround). It's handed to the runtime's osAiSetNextBuffer,
+# which plays the buffer.
+[[patches.hook]]
+func = "func_8000AD10"
+before_vram = 0x8000AD10
+text = "osAiSetNextBuffer_recomp(rdram, ctx); return;"
+
+# Uncached pointers. func_800035B4 and func_800035F8 allocate a buffer,
+# invalidate its cache lines and return it as a KSEG1 (uncached) address,
+# K0 + 0x20000000. The runtime only maps RDRAM at KSEG0, so the adds are
+# removed and the buffers are used through their KSEG0 address, which is the
+# same memory. Nothing in the game converts these pointers back.
+[[patches.instruction]]
+func = "func_800035B4"
+vram = 0x800035E0
+value = 0x00000000
+
+[[patches.instruction]]
+func = "func_800035F8"
+vram = 0x80003624
+value = 0x00000000
+
+# True widescreen (Expand): a level's background layers are created with the
+# view width from the level data (320). Widen it before func_8004EEEC
+# allocates each layer's ring buffer and records the view size; the streamer,
+# the camera window and the background draw all follow that size.
+[[patches.hook]]
+func = "func_8004F2B0"
+before_vram = 0x8004F34C
+text = "ctx->r4 = (gpr)(int32_t)dinotale_bg_view_width(rdram, (int32_t)ctx->r4);"
+
+# True widescreen (Expand): the camera's horizontal wall probe uses half the
+# view width (160.0, loaded with `lui $at, 0x4320`); use half the widened
+# width instead, so the camera stops before the wider view passes a level's
+# ends. (The vertical probe in func_8002A630 keeps 160.)
+[[patches.hook]]
+func = "func_8002A148"
+before_vram = 0x8002A1AC
+text = "ctx->r1 = (gpr)(int32_t)dinotale_camera_half_width_bits();"
+
+
+# The background view func_8004EEEC just created (in $v0): clear its ring
+# buffer; see src/game/widescreen.cpp.
+[[patches.hook]]
+func = "func_8004F2B0"
+before_vram = 0x8004F354
+text = "dinotale_bg_view_created(rdram, (uint32_t)ctx->r2);"
+
+# A background layer being freed (the end of a level): Expand's view width is
+# kept for the whole level, see src/game/widescreen.cpp.
+[[patches.hook]]
+func = "func_8004F38C"
+before_vram = 0x8004F38C
+text = "dinotale_bg_view_freed(rdram, (uint32_t)ctx->r4);"
+
+# Expand: before a background layer is drawn, tell the renderer how much of
+# it lies left of the layer's art (the wider view reaches past it at a level's
+# start), to cover with black; see src/game/widescreen.cpp. Both draw paths:
+# after streaming (func_8005F5D0: target in $s1, view object in $s0) and
+# without (func_8005F690: target at sp+0x20, view object at sp+0x24).
+[[patches.hook]]
+func = "func_8005F5D0"
+before_vram = 0x8005F658
+text = "dinotale_bg_cover_outside(rdram, (uint32_t)ctx->r17, (uint32_t)ctx->r16);"
+
+[[patches.hook]]
+func = "func_8005F690"
+before_vram = 0x8005F6DC
+text = "dinotale_bg_cover_outside(rdram, (uint32_t)MEM_W(0x20, ctx->r29), (uint32_t)MEM_W(0x24, ctx->r29));"
+
+# Expand: the fruit frame (30 slots around the screen edge) spread across the
+# wider screen; see src/game/widescreen.cpp.
+[[patches.hook]]
+func = "func_80579F18"
+before_vram = 0x80579F18
+text = "dinotale_fruit_frame_begin(rdram, (uint32_t)ctx->r5);"
+
+[[patches.hook]]
+func = "func_80579F18"
+before_vram = 0x8057A2B0
+text = "dinotale_fruit_frame_end(rdram);"
+
+# Expand: the health flower moves out to the left edge of the wider screen;
+# see src/game/widescreen.cpp. At the end of func_8004733C (actor in $a2,
+# screen x pointer at sp+0x18).
+[[patches.hook]]
+func = "func_8004733C"
+before_vram = 0x80047418
+text = "dinotale_hud_actor_screen_pos(rdram, ctx);"
+
+# Expand: a background row request covers the level's column count (20, +1
+# when the view isn't on a tile boundary), not the view's width, so rows
+# streamed in as the camera moves vertically stopped short of the wider
+# view's right side. Add the extra columns; see src/game/widescreen.cpp.
+# func_8004FB98 stores the count ($t1) into the request at 0x8004FBF4.
+[[patches.hook]]
+func = "func_8004FB98"
+before_vram = 0x8004FBF4
+text = "ctx->r9 = dinotale_bg_row_columns(ctx->r9);"
+
+# A background layer's full refill (func_8004FA64: a level's start, a teleport
+# or area change) requests the view's width in 16-pixel tile columns from the
+# view's left column, without the extra column the row request adds when the
+# view isn't on a tile boundary. Expand's view starts 56 px left of the 4:3
+# one (half a tile off), so the refill stopped 8 px short of the right edge,
+# which showed whatever was left there (after a teleport, the page turn).
+# The count is in $t6 at 0x8004FADC; the view is at sp+0x1C.
+[[patches.hook]]
+func = "func_8004FA64"
+before_vram = 0x8004FADC
+text = "ctx->r14 = dinotale_bg_fill_columns(rdram, (uint32_t)MEM_W(0x1C, ctx->r29), (int32_t)ctx->r14);"
+
+# Expand: keeping Yoshi on screen. func_800233B4 checks his screen x against
+# 16 and 304 (the 320-wide screen less 16 px) and past either calls
+# func_80023310, which puts him back at the camera's centre -/+ 144. Move
+# both out to the wider view's edges, or he jumps from the 4:3 edge to the
+# wider one (and at a level's start off the level); at a level's start the
+# left limit stays at the level's edge. See src/game/widescreen.cpp.
+# The checks: `slti $at, <reg>, 0x130 / 0x10` at 0x800234DC ($t3),
+# 0x80023534 ($t7), 0x8002358C ($t0) and 0x80023598 ($t1); actor in $a0.
+[[patches.hook]]
+func = "func_800233B4"
+before_vram = 0x800234DC
+text = "ctx->r11 = (gpr)dinotale_screen_right_test((int32_t)ctx->r11);"
+
+[[patches.hook]]
+func = "func_800233B4"
+before_vram = 0x80023534
+text = "ctx->r15 = (gpr)dinotale_screen_left_test(rdram, (uint32_t)ctx->r4, (int32_t)ctx->r15);"
+
+[[patches.hook]]
+func = "func_800233B4"
+before_vram = 0x8002358C
+text = "ctx->r8 = (gpr)dinotale_screen_right_test((int32_t)ctx->r8);"
+
+[[patches.hook]]
+func = "func_800233B4"
+before_vram = 0x80023598
+text = "ctx->r9 = (gpr)dinotale_screen_left_test(rdram, (uint32_t)ctx->r4, (int32_t)ctx->r9);"
+
+# The spot func_80023310 puts him back at: the constants are loaded into $at
+# by `lui` at 0x80023368 / 0x80023380 (actor in $a0).
+[[patches.hook]]
+func = "func_80023310"
+before_vram = 0x8002336C
+text = "ctx->r1 = dinotale_screen_margin_bits(rdram, (uint32_t)ctx->r4, -1);"
+
+[[patches.hook]]
+func = "func_80023310"
+before_vram = 0x80023384
+text = "ctx->r1 = dinotale_screen_margin_bits(rdram, (uint32_t)ctx->r4, 1);"
+
+# Expand: actors' on-screen tests against the 320-wide screen. Each loads the
+# actor's screen x (+0x34) and compares it with bounds at or past the screen's
+# edges; pass it through dinotale_actor_screen_x so the bounds follow the
+# wider view's edges. See src/game/widescreen.cpp.
+# func_800591EC(x, y, margin_x, margin_y): the shared test, 1 if
+# -margin_x < x < 320 + margin_x (the camera's width, +0x9C) and likewise for
+# y; called with an actor's screen x from the "is it on screen" helpers
+# (func_80059278, func_800592AC) and others. Bob-ombs and others despawn
+# when it fails.
+[[patches.hook]]
+func = "func_800591EC"
+before_vram = 0x800591EC
+text = "ctx->r4 = (gpr)dinotale_actor_screen_x((int32_t)ctx->r4);"
+
+# ovl_096 (5-4's Shy Guys on stilts): the stilts are drawn only while
+# 0 <= x < 320 (`bltz $v0` / `slti $at, $v0, 0x140`).
+[[patches.hook]]
+func = "func_805175E4"
+before_vram = 0x80517630
+text = "ctx->r2 = (gpr)dinotale_actor_screen_x((int32_t)ctx->r2);"
+
+# These hooks belong only to the separate PC special-content build.
+# Exact native entry points keep vanilla cases on their original paths.
+
+# Respect the egg's own native color, including bounce/recolor transitions.
+# The old ROM helper unconditionally replaced it with the current hybrid.
+[[patches.hook]]
+func = "workshop_807F0600"
+before_vram = 0x807F0600
+text = "ctx->r24=S32(ctx->r5<<9);workshop_8003B8C8(rdram,ctx);return;"
+
+# Only the factory that asks for the current Yoshi's default egg substitutes
+# its extended display color. Enemy-colored eggs keep their chosen color.
+[[patches.hook]]
+func = "func_8003BA24"
+before_vram = 0x8003BA74
+text = "workshop_egg_default_color(rdram,ctx);"
+
+# A swallowed custom Maskass contributes its current six-color variant to
+# the same native egg factory used by the ordinary Maskass colors.
+[[patches.hook]]
+func = "func_800329B8"
+before_vram = 0x80032A24
+text = "workshop_egg_enemy_color(rdram,ctx);"
+
+# The native Lucky index stays in its safe four-entry range. Only the
+# consumption comparisons and explicit Lucky-fruit factories use the hybrid.
+[[patches.hook]]
+func = "func_80022360"
+before_vram = 0x80022384
+text = "if(workshop_hybrid_active())ctx->r4=workshop_hybrid_lucky_object();"
+
+[[patches.hook]]
+func = "func_8002B470"
+before_vram = 0x8002B4D8
+text = "if(workshop_hybrid_active())ctx->r11=workshop_hybrid_lucky_type();"
+[[patches.hook]]
+func = "func_8002B200"
+before_vram = 0x8002B328
+text = "if(workshop_hybrid_active())ctx->r24=workshop_hybrid_lucky_type();"
+[[patches.hook]]
+func = "func_807AF010"
+before_vram = 0x807AF030
+text = "if(workshop_hybrid_active())ctx->r24=workshop_hybrid_lucky_object();"
+[[patches.hook]]
+func = "func_804001DC"
+before_vram = 0x804006C0
+text = "if(workshop_hybrid_active())ctx->r12=workshop_hybrid_lucky_object();"
+
+# Follow the successful native ground-pound change, including its camera
+# and on-screen gates and sound, then advance the custom six-color cycle.
+[[patches.hook]]
+func = "func_800692D4"
+before_vram = 0x800694A8
+text = "workshop_hybrid_recolor(rdram,ctx);"
+
+# Preserve the ordinary records inside the physical EEPROM buffer while
+# retaining the hybrid records in RAM and in their own persistent sidecar.
+[[patches.hook]]
+func = "workshop_ext_eeprom_write"
+before_vram = 0x807F3CF4
+text = "if(!workshop_hybrid_records_save(rdram,ctx)){ctx->r2=1;ctx->r31=MEM_W(0x14,ctx->r29);ctx->r29=ADD32(ctx->r29,0x20);return;}"
+
+# An egg purchase authorizes the search; it does not grant the Yoshi. Keep
+# the completed-Trial requirement in Story and Trial before spawning either.
+[[patches.hook]]
+func = "func_80400118"
+before_vram = 0x80400118
+text = "if(workshop_egg_bubble_gate(rdram,ctx))return;"
+
+[[patches.hook]]
+func = "func_8003BC2C"
+before_vram = 0x8003BC2C
+text = "if(!workshop_egg_allowed(rdram,6)){ctx->r2=0;return;}"
+[[patches.hook]]
+func = "func_8003BBF4"
+before_vram = 0x8003BBF4
+text = "if(!workshop_egg_allowed(rdram,7)){ctx->r2=0;return;}"
+
+# Reward amounts are independent of the native food animation class. Keep
+# native clamping/combo logic while allowing the associated hybrid fruit +4
+# and the rounded mean of both component colors for consumed enemies.
+[[patches.hook]]
+func = "workshop_8002B520"
+before_vram = 0x8002B530
+text = "workshop_food_health(rdram,ctx);"
+
+[[patches.hook]]
+func = "func_8002B200"
+before_vram = 0x8002B220
+text = "workshop_food_score(rdram,ctx);"
+
+[[patches.hook]]
+func = "func_8002B200"
+before_vram = 0x8002B384
+text = "workshop_food_popup(rdram,ctx);"
+
+# Native kill scoring multiplies the base reward by 2, then applies its
+# existing combo growth. Read the victim's current properties (t0).
+[[patches.hook]]
+func = "workshop_8003D93C"
+before_vram = 0x8003D944
+text = "workshop_enemy_kill_reward(rdram,ctx);"
+
+# The new fourth-point bubble uses one queue item and the native animation.
+# Larger unsupported values retain multiple bubbles and their multipliers.
+[[patches.hook]]
+func = "func_8002B03C"
+before_vram = 0x8002B03C
+text = "if(workshop_split_reward_popup(rdram,ctx))return;"
+
+[[patches.hook]]
+func = "func_800431D8"
+before_vram = 0x80043230
+text = "if(ctx->r2==8)ctx->r2=4;"
+[[patches.hook]]
+func = "func_800431D8"
+before_vram = 0x800432D0
+text = "if(MEM_BU(0x1310,ctx->r10)==8){MEM_B(0x42,ctx->r29)=6;MEM_W(0x3C,ctx->r29)=4;}"
+[[patches.hook]]
+func = "func_800431D8"
+before_vram = 0x80043340
+text = "workshop_reward_popup_created(rdram,ctx);"
+
+# Name Entry cycles three complete chalk drawings. Keep its drawing stable;
+# preserve the chosen keyboard/layout, its transition and the cursor timers.
+[[patches.hook]]
+func = "func_80739A40"
+before_vram = 0x80739B08
+text = "ctx->r5=0;"
+
+# Pause's live mood estimate counted only eight native life flags. Use the
+# same earned/alive fourteen-color mask as the existing end-of-course tally.
+[[patches.hook]]
+func = "func_807B4A74"
+before_vram = 0x807B4AD4
+text = "workshop_pause_score_lives(rdram,ctx);"
+
+[[patches.hook]]
+func = "func_80050C8C"
+before_vram = 0x80050C8C
+text = "{ uint32_t id = ctx->r4 & 0xFFFF; if (id >= 0x4F00 && id < 0x4F06) { workshop_special_lookup_note(id); ctx->r5=id; ctx->r2 = (gpr)(int32_t)(0x807FC000 + (id - 0x4F00) * 12); return; } if (id == 0x4013 && workshop_use_special_hud()) { workshop_special_lookup_note(id); ctx->r5=id; ctx->r2 = (gpr)(int32_t)0x807FC048; return; } if (id == 0x4006) {ctx->r5=id;ctx->r2=(gpr)(int32_t)0x807FC054;return;} if(id==0x402C){ctx->r5=id;ctx->r2=(gpr)(int32_t)0x807FC060;return;} if(id==0x4016){ctx->r5=id;ctx->r2=(gpr)(int32_t)0x807FC06C;return;} }"
+
+[[patches.instruction]]
+func = "func_807B6778"
+vram = 0x807B679C
+value = 0x24050034
+
+[[patches.hook]]
+func = "workshop_807F0800"
+before_vram = 0x807F0800
+text = "workshop_pause_create(rdram,ctx); return;"
+
+[[patches.hook]]
+func = "workshop_807F0A00"
+before_vram = 0x807F0A00
+text = "workshop_pause_position(rdram,ctx);ctx->r31=MEM_W(0x14,ctx->r29);ctx->r29=ADD32(ctx->r29,0x20);return;"
+
+[[patches.hook]]
+func = "workshop_807F0D00"
+before_vram = 0x807F0D00
+text = "if(workshop_pause_frame(rdram,ctx)){workshop_807BA370(rdram,ctx);return;}"
+
+[[patches.hook]]
+func = "workshop_807F0C00"
+before_vram = 0x807F0C00
+text = "workshop_pause_hide(rdram,ctx);"
+
+# The beige transition creates actor 4006 using the native aliased color.
+# Select the extended display color after its native load, with 14 palettes.
+[[patches.hook]]
+func = "func_807BA478"
+before_vram = 0x807BA4E0
+text = "{ uint32_t color=MEM_W(0,(gpr)(int32_t)0x807F0008); if(color<14)ctx->r25=color; }"
+
+[[patches.hook]]
+func = "func_8002B088"
+before_vram = 0x8002B088
+text = "{ uint32_t id = MEM_HU(12, ctx->r4); if (id >= 0x4F00 && id < 0x4F06) { ctx->r2 = 6 + id - 0x4F00; return; } }"
+
+# The native spawn table has seven entries. Use its safe apple template;
+# the custom food bridge supplies the actual preferences when collected.
+[[patches.hook]]
+func = "func_80574A88"
+before_vram = 0x80574A88
+text = "if ((uint32_t)(ctx->r4 - 0x4F00) < 6) { ctx->r2 = 0; return; }"
+
+# World fruit initialization computes ID - 0x402D independently of the
+# food classifier. Custom IDs previously selected frames 3795..3800.
+# Each custom atlas contains the approved sprite in all nine slots; use
+# the native apple slot without changing the actor's food identity.
+[[patches.hook]]
+func = "func_805741B8"
+before_vram = 0x805741D8
+text = "if ((uint32_t)(ctx->r14 - 0x4F00) < 6) ctx->r15 = 3;"
+
+# Register all six resources before the native loader scans gameplay objects.
+# A fruit may be created inside a bubble or by an enemy later in the room.
+# Custom editor payloads keep their exact chosen fruit placements.
+[[patches.hook]]
+func = "func_80051418"
+before_vram = 0x80051450
+text = "workshop_mix_level(rdram,ctx);"
+
+# The fruit factory is shared by placed fruit, bubble contents and rewards.
+# Choose once when creating the actual fruit; retain source placement data.
+[[patches.hook]]
+func = "func_80574B44"
+before_vram = 0x80574B6C
+text = "ctx->r5=workshop_mix_spawn(rdram,ctx);"
+
+# Clear a container's saved choice only when its actor is initialized again;
+# pooled addresses can then be used by a genuinely new fruit source.
+# Pooled fruit also need a fresh resource binding when crossing hybrid atlases.
+[[patches.hook]]
+func = "func_80045CAC"
+before_vram = 0x80045CAC
+text = "workshop_mix_parent_created((uint32_t)ctx->r4); workshop_prepare_fruit_resource(rdram,ctx);"
+
+# The reused actor already has render state, whose borrowed palette/texture
+# still belong to the preceding fruit. Refresh it after native initialization.
+[[patches.hook]]
+func = "func_80045CAC"
+before_vram = 0x80046004
+text = "if (ctx->r2) workshop_finish_fruit_resource(rdram,ctx);"
+
+# Keep a distinct fruit type (6..11) in the native ring and tally arrays.
+[[patches.hook]]
+func = "func_80573F94"
+before_vram = 0x80573FDC
+text = "if ((uint32_t)(ctx->r2 - 0x4F00) < 6) ctx->r4 = 6 + ctx->r2 - 0x4F00;"
+
+[[patches.hook]]
+func = "workshop_807F1500"
+before_vram = 0x807F1500
+text = "if (workshop_special_food(rdram, ctx)) { workshop_807F016C(rdram, ctx); return; }"
+
+# The original 150-entry ROM resource cache fills while preloading the six
+# additional fruit definitions. Move its two arrays into reserved extension
+# RAM (outside game heaps/code), and grow them together to 512 entries.
+[[patches.instruction]]
+func = "func_800505F0"
+vram = 0x800505F8
+value = 0x3C048080
+[[patches.instruction]]
+func = "func_800505F0"
+vram = 0x800505FC
+value = 0x24848000
+[[patches.instruction]]
+func = "func_800505F0"
+vram = 0x80050600
+value = 0x24051800
+[[patches.instruction]]
+func = "func_800505F0"
+vram = 0x80050610
+value = 0x3C058080
+[[patches.instruction]]
+func = "func_800505F0"
+vram = 0x80050614
+value = 0x24A59800
+[[patches.instruction]]
+func = "func_800505F0"
+vram = 0x80050620
+value = 0x24060200
+[[patches.instruction]]
+func = "func_80050790"
+vram = 0x800507AC
+value = 0x24010200
+[[patches.instruction]]
+func = "func_80050790"
+vram = 0x800507D8
+value = 0x3C0F8080
+[[patches.instruction]]
+func = "func_80050790"
+vram = 0x800507DC
+value = 0x25EF8000
+[[patches.hook]]
+func = "func_800579E4"
+before_vram = 0x800579E4
+text = "if (workshop_resource_slot(rdram,ctx,0)) return;"
+[[patches.hook]]
+func = "func_80057AC0"
+before_vram = 0x80057AC0
+text = "if (workshop_resource_slot(rdram,ctx,1)) return;"
+
+# Bounded diagnostic fixtures only; these helpers do nothing in ordinary play.
+[[patches.hook]]
+func = "func_800436E0"
+before_vram = 0x8004381C
+text = "workshop_test_level_start(rdram,ctx);"
+[[patches.hook]]
+func = "func_800245A0"
+before_vram = 0x800245A0
+text = "workshop_palette_note(rdram,ctx,0);"
+[[patches.hook]]
+func = "func_8004590C"
+before_vram = 0x8004590C
+text = "workshop_palette_note(rdram,ctx,1);"
+[[patches.hook]]
+func = "Fault_HungUp"
+before_vram = 0x80071380
+text = "workshop_native_fault(rdram,ctx);"
+
+# Replace the native four-choice menu after its title Start transition.
+[[patches.hook]]
+func = "func_80450AD0"
+before_vram = 0x80450AD0
+text = "if(workshop_menu_title(rdram,ctx))return;"
+
+[[patches.hook]]
+func = "workshop_ys_ext_valid"
+before_vram = 0x807F283C
+text = "ctx->r2=workshop_progress_valid(rdram,ctx); return;"
+
+# Sixth hybrid: all 24 Trial courses accessible through Story is enough.
+# Preserve native validation, stored draws, stack handling and egg gates.
+[[patches.hook]]
+func = "workshop_ys_ext_unlocked_mask"
+before_vram = 0x807F2A64
+text = "if(workshop_progress_trial_access(rdram))ctx->r13=0xFFFFFF;"
+
+[[patches.hook]]
+func = "workshop_ys_ext_complete_trial"
+before_vram = 0x807F2D9C
+text = "if(workshop_progress_trial(rdram,ctx)) return;"
+
+[[patches.hook]]
+func = "workshop_ext_eeprom_read"
+before_vram = 0x807F3DA8
+text = "workshop_progress_read_begin(rdram,ctx);"
+
+[[patches.hook]]
+func = "workshop_ext_eeprom_read"
+before_vram = 0x807F3F64
+text = "workshop_progress_read_end(rdram,ctx);"
+
+[[patches.hook]]
+func = "func_800697F0"
+before_vram = 0x80069870
+text = "workshop_progress_boot(rdram,ctx);"
+
+[[patches.hook]]
+func = "workshop_ext_eeprom_write"
+before_vram = 0x807F3C90
+text = "workshop_progress_reconcile(rdram,ctx);"
+
+# Include eggs and automatic hybrid rewards earned at this same finish.
+# Keep the native score storage, animation and later save order intact.
+[[patches.hook]]
+func = "func_800409F0"
+before_vram = 0x80040A2C
+text = "workshop_end_score_lives(rdram,ctx);"
+
+# Objectives still draw their original colors; only found colors join the team.
+[[patches.hook]]
+func = "workshop_ext_unlocked"
+before_vram = 0x807F3980
+text = "ctx->r2=workshop_find_unlocked(rdram);return;"
+
+[[patches.hook]]
+func = "workshop_ys_ext_trial_color_unlocked"
+before_vram = 0x807F2FB8
+text = "if(ctx->r5>=8 && ctx->r5<14)ctx->r2=ctx->r2 && (workshop_find_unlocked(rdram)&(1u<<(ctx->r5-8)));"
+
+[[patches.hook]]
+func = "func_8003B540"
+before_vram = 0x8003B5A0
+text = "workshop_find_egg_state(rdram,ctx);"
+
+[[patches.hook]]
+func = "workshop_807F1100"
+before_vram = 0x807F1100
+text = "workshop_find_reset();"
+
+[[patches.hook]]
+func = "workshop_ext_clear_all"
+before_vram = 0x807F3F6C
+text = "workshop_find_clear();"
+
+# The other native White Shy Guy sources are concealed in item containers.
+[[patches.hook]]
+func = "workshop_8059F2C0"
+before_vram = 0x8059F2C0
+text = "if(workshop_find_release(rdram,ctx))return;"
+
+# Retain their reveal/interaction, replacing only their White Shy Guy reward.
+[[patches.hook]]
+func = "func_806F616C"
+before_vram = 0x806F6184
+text = "workshop_find_container_gate(rdram,ctx);"
+[[patches.hook]]
+func = "func_8079AC9C"
+before_vram = 0x8079AD44
+text = "workshop_find_container_gate(rdram,ctx);"
+[[patches.hook]]
+func = "func_80799F20"
+before_vram = 0x80799F20
+text = "if(workshop_find_hidden(rdram,ctx,ctx->r4))return;"
+[[patches.hook]]
+func = "func_806F55E8"
+before_vram = 0x806F58E0
+text = "if(workshop_find_hidden(rdram,ctx,ctx->r20))ctx->r2=0;"
+
+[[patches.hook]]
+func = "workshop_ext_fresh_trial"
+before_vram = 0x807F3A08
+text = "workshop_find_reset();"
+
+[[patches.hook]]
+func = "workshop_807F1800"
+before_vram = 0x807F1800
+text = "workshop_find_reset();"
+
+# Generated, checked references to the per-ID resource metadata table.
+[[patches.instruction]]
+func = "func_8005B940"
+vram = 0x8005B948
+value = 0x3C048081
+[[patches.instruction]]
+func = "func_8005B940"
+vram = 0x8005B94C
+value = 0x24840000
+[[patches.instruction]]
+func = "func_8005B9E8"
+vram = 0x8005B9F4
+value = 0x3C108081
+[[patches.instruction]]
+func = "func_8005B9E8"
+vram = 0x8005B9F8
+value = 0x3C118083
+[[patches.instruction]]
+func = "func_8005B9E8"
+vram = 0x8005BA00
+value = 0x26318000
+[[patches.instruction]]
+func = "func_8005B9E8"
+vram = 0x8005BA04
+value = 0x26100000
+[[patches.instruction]]
+func = "func_8005BA40"
+vram = 0x8005BA5C
+value = 0x3C0F8081
+[[patches.instruction]]
+func = "func_8005BA40"
+vram = 0x8005BA60
+value = 0x25EF0000
+[[patches.instruction]]
+func = "func_8005BA80"
+vram = 0x8005BAF0
+value = 0x3C188081
+[[patches.instruction]]
+func = "func_8005BA80"
+vram = 0x8005BB08
+value = 0x27180000
+[[patches.instruction]]
+func = "func_8005BA80"
+vram = 0x8005BB10
+value = 0xAC590000
+[[patches.instruction]]
+func = "func_8005BA80"
+vram = 0x8005BB14
+value = 0xAC480004
+[[patches.instruction]]
+func = "func_8005BB28"
+vram = 0x8005BB5C
+value = 0x3C028081
+[[patches.instruction]]
+func = "func_8005BB28"
+vram = 0x8005BB64
+value = 0x8C420000
+[[patches.instruction]]
+func = "func_8005BB78"
+vram = 0x8005BBAC
+value = 0x3C028081
+[[patches.instruction]]
+func = "func_8005BB78"
+vram = 0x8005BBB4
+value = 0x8C420004
+[[patches.instruction]]
+func = "func_8005BBC8"
+vram = 0x8005BC30
+value = 0x3C188081
+[[patches.instruction]]
+func = "func_8005BBC8"
+vram = 0x8005BC48
+value = 0x27180000
+[[patches.instruction]]
+func = "func_8005BBC8"
+vram = 0x8005BC50
+value = 0xAC590008
+[[patches.instruction]]
+func = "func_8005BBC8"
+vram = 0x8005BC54
+value = 0xAC48000C
+[[patches.instruction]]
+func = "func_8005BC68"
+vram = 0x8005BC9C
+value = 0x3C028081
+[[patches.instruction]]
+func = "func_8005BC68"
+vram = 0x8005BCA4
+value = 0x8C420008
+[[patches.instruction]]
+func = "func_8005BCB8"
+vram = 0x8005BCEC
+value = 0x3C028081
+[[patches.instruction]]
+func = "func_8005BCB8"
+vram = 0x8005BCF4
+value = 0x8C42000C
+[[patches.instruction]]
+func = "func_8005BD08"
+vram = 0x8005BD70
+value = 0x3C188081
+[[patches.instruction]]
+func = "func_8005BD08"
+vram = 0x8005BD88
+value = 0x27180000
+[[patches.instruction]]
+func = "func_8005BD08"
+vram = 0x8005BD90
+value = 0xAC590010
+[[patches.instruction]]
+func = "func_8005BD08"
+vram = 0x8005BD94
+value = 0xAC480014
+[[patches.instruction]]
+func = "func_8005BDA8"
+vram = 0x8005BDDC
+value = 0x3C028081
+[[patches.instruction]]
+func = "func_8005BDA8"
+vram = 0x8005BDE4
+value = 0x8C420010
+[[patches.instruction]]
+func = "func_8005BDF8"
+vram = 0x8005BE2C
+value = 0x3C028081
+[[patches.instruction]]
+func = "func_8005BDF8"
+vram = 0x8005BE34
+value = 0x8C420014
+[[patches.hook]]
+func = "func_8005B940"
+before_vram = 0x8005B954
+text = "ctx->r5 = 0x18000;"

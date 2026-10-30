@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/wootbeer/dinotale",
+  "tag": "0.1.6",
+  "commit": "65060b54925016f634b4e0e327878f72051cd4a9",
+  "windowsArchiveSha256": "01bbbd7ac42633f4943d9ff247b37cc5174e5ed7aade5eeef0273b2b341fc787",
+  "windowsExeSha256": "8ee0ea0eede35f9c54e8770e057a51cb3d416766a3873c67ef17db0878370771",
+  "romSha256": "e8a63388c38f8f0bea37e9b13a97f0898ac5496e08ca2028afb8db9a866e0ce9",
+  "adapter": "source-built YSLEVEL1 loader; original ROM verification retained; separate placements applied in memory; on-disk ROM and executable unchanged"
+}

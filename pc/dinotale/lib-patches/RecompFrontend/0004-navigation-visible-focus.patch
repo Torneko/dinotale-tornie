@@ -1,0 +1,82 @@
+diff --git a/recompui/src/elements/ui_document.cpp b/recompui/src/elements/ui_document.cpp
+index a60c585..7765e16 100644
+--- a/recompui/src/elements/ui_document.cpp
++++ b/recompui/src/elements/ui_document.cpp
+@@ -1,5 +1,6 @@
+ #include "elements/ui_document.h"
+ #include "recompui/recompui.h"
++#include <cstdio>
+ 
+ // This define shows debug output for the navigation process.
+ // Utilize Element->debug_id to set readable names for your elements.
+@@ -135,6 +136,28 @@ namespace recompui {
+             return elements[index];
+         }
+ 
++        static bool contains(Element *root, Element *target) {
++            if (root == target) return true;
++            for (auto child : root->nav_children) if (contains(child, target)) return true;
++            return false;
++        }
++
++        static Element *first_focusable(Element *root) {
++            const auto focus = root->is_focusable();
++            if (focus == Element::CanFocus::NoAndNoChildren) return nullptr;
++            if (focus == Element::CanFocus::Yes) return root;
++            for (auto child : root->nav_children) {
++                if (auto found = first_focusable(child)) return found;
++            }
++            return nullptr;
++        }
++
++        Element *recovery_target(Element *doc) {
++            auto preferred = get_current_context().get_autofocus_element();
++            if (preferred && preferred->is_focusable() == Element::CanFocus::Yes && contains(doc, preferred)) return preferred;
++            return first_focusable(doc);
++        }
++
+         // Use nav_direction to filter elements that match that direction, then pick the closest.
+         Element *get_element_in_nav_direction(Element *this_element, std::vector<Element *> &elements) {
+             if (elements.empty()) {
+@@ -198,7 +221,10 @@ namespace recompui {
+ 
+             int cur_element_index = get_element_index(this_element, nav_parent->nav_children);
+             if (cur_element_index == -1) {
+-                throw std::runtime_error("This should never ever ever happen. Element not found in its parent's nav children.");
++                // A page may have hidden the focused element or one of its
++                // ancestors. Its old parent is no longer in the rebuilt tree.
++                // Let the document select a visible target instead of throwing.
++                return nullptr;
+             }
+ 
+             // Process grid navigation if retained_grid_index is valid and grid navs are different.
+@@ -387,9 +413,18 @@ namespace recompui {
+             }
+ 
+             RecompNav nav_context(this, key_identifier);
++            auto recover_focus = [&]() {
++                auto target = nav_context.recovery_target(this);
++                if (!target || !target->focus()) return false;
++                report_focused_element();
++                event.StopPropagation();
++                fprintf(stderr, "[UiNavigation] recovered visible focus=%s\n", target->get_id().c_str());
++                return true;
++            };
+ 
+-            if (nav_context.original_focused_element == nullptr) {
+-                return false;
++            if (nav_context.original_focused_element == nullptr ||
++                nav_context.original_focused_element->is_focusable() != Element::CanFocus::Yes) {
++                return recover_focus();
+             }
+ 
+             #ifdef RECOMPUI_NAV_DEBUG
+@@ -398,7 +433,7 @@ namespace recompui {
+ 
+             Element *next_top_element = nav_context.unwind_nav_in_direction(nav_context.original_focused_element);
+             if (next_top_element == nullptr) {
+-                return false;
++                return recover_focus();
+             }
+ 
+             #ifdef RECOMPUI_NAV_DEBUG

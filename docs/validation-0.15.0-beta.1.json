@@ -1,0 +1,22 @@
+{
+  "exeSha256": "70ccc19e41a2c1c0342d39b34e24078fe2a20082f83946bf032816a6d7d3cd2f",
+  "initialSaveSha256": "ccca4870f3b5f2d11519568c1f003387a62f5d13adbed9ed99c8089b74c68585",
+  "volumePercent": 10,
+  "platform": "Windows",
+  "nativeLevelEntryVerified": true,
+  "manualVisualReview": false,
+  "hardwareMintTest": false,
+  "exitCode": 0,
+  "elapsedSeconds": 76.97,
+  "boundedExitVerified": true,
+  "runtimeValidation": "passed",
+  "version": "0.15.0-beta.1",
+  "packagedImporterVerified": true,
+  "packagedWorkshopStartupVerified": true,
+  "launcherBeforeImportExit": 3,
+  "launcherAfterImportExit": 0,
+  "generatedSourcesReproduced": 219,
+  "sourceRomIncluded": false,
+  "personalProgressIncluded": false,
+  "manualFullPlaythroughPending": true
+}

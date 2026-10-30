@@ -1,0 +1,95 @@
+diff --git a/recompui/include/recompui/recompui.h b/recompui/include/recompui/recompui.h
+index 30c463b..ae9ecad 100644
+--- a/recompui/include/recompui/recompui.h
++++ b/recompui/include/recompui/recompui.h
+@@ -41,6 +41,11 @@ namespace recompui {
+ 
+     // Use this to update the launcher each frame.
+     void register_launcher_update_callback(std::function<void(LauncherMenu *menu)> callback);
++    // Runs on the UI thread each rendered frame, including during gameplay.
++    void register_frame_callback(std::function<void()> callback);
++    // Keep UI events and rendering running while a host parks the game thread.
++    void set_idle_ui_rendering(bool enabled);
++    void set_idle_ui_watchdog(bool enabled);
+ 
+     class UiEventListenerInstancer;
+ 
+diff --git a/recompui/src/base/ui_state.cpp b/recompui/src/base/ui_state.cpp
+index 277a421..564f2f0 100644
+--- a/recompui/src/base/ui_state.cpp
++++ b/recompui/src/base/ui_state.cpp
+@@ -34,6 +34,8 @@
+ #include "util/file.h"
+ 
+ static std::atomic_bool cursor_enabled = true;
++static std::function<void()> frame_callback;
++void recompui::register_frame_callback(std::function<void()> callback) { frame_callback=std::move(callback); }
+ 
+ void recompui::open_quit_game_prompt() {
+     recompui::open_choice_prompt(
+@@ -809,7 +811,7 @@ void draw_hook(plume::RenderCommandList* command_list, plume::RenderFramebuffer*
+         }
+ 
+         // If the config menu isn't open and the game has been started and either the escape key or select button are pressed, open the config menu.
+-        if (!config_was_open && ultramodern::is_game_started()) {
++        if (!config_was_open && ultramodern::is_game_started() && !context_capturing_input) {
+             bool open_config = false;
+ 
+             switch (cur_event.type) {
+@@ -858,6 +860,7 @@ void draw_hook(plume::RenderCommandList* command_list, plume::RenderFramebuffer*
+ 
+     ui_state->update_primary_input(mouse_moved, non_mouse_interacted);
+     ui_state->update_focus(mouse_moved, non_mouse_interacted);
++    if(frame_callback)frame_callback();
+ 
+     if (recompui::is_any_context_shown()) {
+         if (recompui::is_context_shown(recompui::get_launcher_context_id())) {
+diff --git a/recompui/src/renderer/rt64_render_context.cpp b/recompui/src/renderer/rt64_render_context.cpp
+index a7954c7..ac75dec 100644
+--- a/recompui/src/renderer/rt64_render_context.cpp
++++ b/recompui/src/renderer/rt64_render_context.cpp
+@@ -17,6 +17,12 @@
+ 
+ using namespace recompui;
+ 
++static std::atomic_bool idle_ui_rendering{false};
++static std::atomic_bool idle_ui_watchdog{false};
++static auto last_display_list=std::chrono::steady_clock::now();
++void recompui::set_idle_ui_rendering(bool enabled) { idle_ui_rendering=enabled; }
++void recompui::set_idle_ui_watchdog(bool enabled) { idle_ui_watchdog=enabled; }
++
+ static RT64::UserConfiguration::Antialiasing device_max_msaa = RT64::UserConfiguration::Antialiasing::None;
+ static bool sample_positions_supported = false;
+ static bool high_precision_fb_enabled = false;
+@@ -338,6 +359,7 @@ renderer::RT64Context::RT64Context(uint8_t* rdram, ultramodern::renderer::Window
+ renderer::RT64Context::~RT64Context() = default;
+ 
+ void renderer::RT64Context::send_dl(const OSTask* task) {
++    last_display_list=std::chrono::steady_clock::now();
+     check_texture_pack_actions();
+     app->state->rsp->reset();
+     app->interpreter->loadUCodeGBI(task->t.ucode & 0x3FFFFFF, task->t.ucode_data & 0x3FFFFFF, true);
+@@ -345,6 +367,7 @@ void renderer::RT64Context::send_dl(const OSTask* task) {
+ }
+ 
+ void renderer::RT64Context::send_dummy_workload(uint32_t fb_address) {
++    last_display_list=std::chrono::steady_clock::now();
+     app->state->listProcessBegin();
+     app->state->rdp->setColorImage(G_IM_FMT_RGBA, G_IM_SIZ_16b, 320, fb_address);
+     // G_AD_DISABLE | G_CD_MAGICSQ | G_CK_NONE | G_TC_FILT | G_TF_BILERP | G_TT_NONE | G_TL_TILE | G_TD_CLAMP | G_TP_PERSP | G_CYC_FILL | G_PM_NPRIMITIVE
+@@ -357,7 +380,14 @@ void renderer::RT64Context::send_dummy_workload(uint32_t fb_address) {
+ 
+ void renderer::RT64Context::update_screen() {
+     check_refresh_rate_changes();
+-    app->updateScreen();
++    bool idle=idle_ui_watchdog.load() && std::chrono::steady_clock::now()-last_display_list>std::chrono::milliseconds(100);
++    if (idle_ui_rendering.load() || idle) {
++        // PresentEarly normally waits for a new game display list. A paused
++        // game supplies none, so submit the existing VI at each host refresh.
++        // This preserves the framebuffer and keeps the UI draw hook alive.
++        app->state->updateScreen(app->core.decodeVI(), true);
++    }
++    else app->updateScreen();
+ }
+ 
+ void renderer::RT64Context::shutdown() {

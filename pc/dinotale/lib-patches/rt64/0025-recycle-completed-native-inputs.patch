@@ -1,0 +1,99 @@
+diff --git a/src/render/rt64_native_target.cpp b/src/render/rt64_native_target.cpp
+index 6891b7b..a2f3e72 100644
+--- a/src/render/rt64_native_target.cpp
++++ b/src/render/rt64_native_target.cpp
+@@ -3,8 +3,15 @@
+ //
+ 
+ #include <cstring>
++#include <atomic>
++#include <cstdio>
++#include <stdexcept>
++
++namespace { std::atomic<unsigned> nativeHistoryTestCount{0}; }
++extern "C" void workshop_request_native_history_test(unsigned count) { nativeHistoryTestCount = count; }
+ 
+ #include "rt64_native_target.h"
++#include "rt64_buffer_history.h"
+ 
+ #include "gbi/rt64_f3d.h"
+ #include "shared/rt64_fb_common.h"
+@@ -20,10 +27,7 @@ namespace RT64 {
+     NativeTarget::~NativeTarget() { }
+     
+     void NativeTarget::resetBufferHistory() {
+-        if (readBufferHistoryCount > 1) {
+-            std::swap(readBufferHistory.front(), readBufferHistory.back());
+-            readBufferHistoryCount = 1;
+-        }
++        retainLatestBuffer(readBufferHistory, readBufferHistoryCount);
+ 
+         writeBufferHistoryCount = 0;
+         writeBufferHistoryIndex = 0;
+@@ -63,6 +67,27 @@ namespace RT64 {
+     uint32_t NativeTarget::copyFromRAM(RenderWorker *worker, FramebufferChange &emptyFbChange, uint32_t width, uint32_t height, uint32_t rowStart, uint8_t siz, uint8_t fmt, const uint8_t *data, bool invalidateTargets, const ShaderLibrary *shaderLibrary) {
+         assert(worker != nullptr);
+ 
++        // Requested only by the CLI's finite, scripted diagnostic. Exercise
++        // actual GPU uploads on a separate target; never change game memory.
++        if (const unsigned iterations = nativeHistoryTestCount.exchange(0)) {
++            NativeTarget testTarget;
++            FramebufferChangePool testChanges;
++            auto &change = testChanges.use(worker, FramebufferChange::Type::Color, 8, 8, shaderLibrary->usesHDR);
++            std::vector<uint16_t> pixels(64, 0xF801);
++            size_t maxPool = 0;
++            for (unsigned i = 0; i < iterations; ++i) {
++                if (i && (i % 32 == 0)) pixels[0] ^= 0xFFC0;
++                const auto different = testTarget.copyFromRAM(worker, change, 8, 8, 0,
++                    G_IM_SIZ_16b, G_IM_FMT_RGBA, reinterpret_cast<const uint8_t *>(pixels.data()), false, shaderLibrary);
++                const auto expected = (i == 0) ? 64u : ((i % 32 == 0) ? 1u : 0u);
++                if (different != expected) throw std::runtime_error("Native history diagnostic: wrong pixel changes");
++                maxPool = std::max(maxPool, testTarget.readBufferHistory.size());
++                if (maxPool > 2) throw std::runtime_error("Native history diagnostic: unbounded input pool");
++            }
++            fprintf(stderr, "[NativeHistoryTest] PASS uploads=%u maxPool=%zu latest-pixel-comparisons=correct\n", iterations, maxPool);
++            fflush(stderr);
++        }
++
+         // Create the buffers for change count readback if they've not been created yet.
+         if ((changeCountBuffer == nullptr) || (changeReadbackBuffer == nullptr)) {
+             changeCountBuffer = worker->device->createBuffer(RenderBufferDesc::DefaultBuffer(sizeof(uint32_t), RenderBufferFlag::STORAGE | RenderBufferFlag::UNORDERED_ACCESS));
+@@ -222,6 +247,13 @@ namespace RT64 {
+             uint32_t *readbackData = reinterpret_cast<uint32_t *>(changeReadbackBuffer->map(0, &readRange));
+             modifiedCount = *readbackData;
+             changeReadbackBuffer->unmap();
++
++            // The GPU has completed every command using the older inputs. CPU
++            // framebuffer updates can continue without another draw workload
++            // (for example while a dialogue waits), so recycle here as well.
++            // Keep the newest input for the next comparison and leave the
++            // write/readback history untouched.
++            retainLatestBuffer(readBufferHistory, readBufferHistoryCount);
+         }
+         // Consider all pixels as modified.
+         else {
+diff --git a/src/render/rt64_buffer_history.h b/src/render/rt64_buffer_history.h
+new file mode 100644
+--- /dev/null
++++ b/src/render/rt64_buffer_history.h
+@@ -0,0 +1,20 @@
++#pragma once
++
++#include <cassert>
++#include <cstdint>
++#include <utility>
++#include <vector>
++
++namespace RT64 {
++    // Call only after GPU work referencing older inputs has completed.
++    // Pool capacity may exceed the used count: back() is not necessarily
++    // the latest input after a smaller workload reuses an existing pool.
++    template <typename Buffer>
++    void retainLatestBuffer(std::vector<Buffer> &history, uint32_t &count) {
++        assert(count <= history.size());
++        if (count > 1) {
++            std::swap(history.front(), history[count - 1]);
++            count = 1;
++        }
++    }
++}

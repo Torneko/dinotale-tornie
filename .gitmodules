@@ -1,0 +1,9 @@
+[submodule "pc/dinotale/lib/N64ModernRuntime"]
+	path = pc/dinotale/lib/N64ModernRuntime
+	url = https://github.com/N64Recomp/N64ModernRuntime
+[submodule "pc/dinotale/lib/RecompFrontend"]
+	path = pc/dinotale/lib/RecompFrontend
+	url = https://github.com/N64Recomp/RecompFrontend
+[submodule "pc/dinotale/lib/rt64"]
+	path = pc/dinotale/lib/rt64
+	url = https://github.com/rt64/rt64

@@ -1,0 +1,81 @@
+diff --git a/src/gbi/rt64_gbi_s2dex.cpp b/src/gbi/rt64_gbi_s2dex.cpp
+--- a/src/gbi/rt64_gbi_s2dex.cpp
++++ b/src/gbi/rt64_gbi_s2dex.cpp
+@@ -3,12 +3,14 @@
+ //
+ 
+ #include "rt64_gbi_s2dex.h"
++#include "rt64_gbi_s2dex_slice.h"
+ 
+ #include <algorithm>
+ #include <array>
+ #include <mutex>
+ #include <cmath>
+ #include <cstring>
++#include <cstdlib>
+ 
+ #include "../include/rt64_extended_gbi.h"
+ 
+@@ -447,6 +449,35 @@
+             }
+ 
+             rdp->setTileSize(G_TX_RENDERTILE, 0, 0, 0, 0);
++
++            // A downscaled CI8 background can map an integral TMEM slice to a
++            // fractional number of screen rows. Restarting T at zero for each
++            // slice loses that phase; the occasionally taller rectangle then
++            // samples beyond its loaded rows (thin lines in Jelly Pipe's Slug
++            // room). Partition whole screen rows and derive each load and T
++            // from the same continuous source coordinate instead.
++            const bool phaseAlignedCI8 = scaleBg.imageFmt == G_IM_FMT_CI && scaleBg.imageSiz == G_IM_SIZ_8b &&
++                rdpUsesBilerp && imageSliceLines >= 2 && scaleH > 1024 &&
++                scaleH <= (imageSliceLines - 1) * 1024;
++            if (phaseAlignedCI8 && !std::getenv("DINOTALE_LEGACY_BG_SLICES")) {
++                int64_t sourceY = int64_t(imageY0) << 5;
++                while (frameRemain > 0) {
++                    const auto slice = backgroundSlice(sourceY, tmemSrcLines, frameRemain, imageSliceLines, scaleH);
++                    uint32_t slicePtr = imageAddress + slice.sourceRow * imageSrcWsize + imagePtrX0;
++                    int16_t remainingSourceRows = tmemSrcLines - slice.sourceRow;
++                    bg1CycTMEMLoad(*rdp, scaleBg, imageAddress, slicePtr, remainingSourceRows,
++                        imageSrcWsize, imagePtrX0, tmemSrcLines, tmemSliceWmax,
++                        int16_t(slice.sourceRows), usesBilerp, flagSplit);
++                    const int16_t bottom = framePtrY0 + slice.screenRows;
++                    rdp->drawTexRect(frameX0, framePtrY0 << 2, frameX1, bottom << 2,
++                        G_TX_RENDERTILE, imageS, uint16_t(slice.phase >> 5), scaleW, scaleH, false);
++                    framePtrY0 = bottom;
++                    frameRemain -= slice.screenRows;
++                    sourceY += int64_t(slice.screenRows) * scaleH;
++                }
++                state->endSpriteCommand();
++                return;
++            }
+             
+             // Draw the image.
+             int16_t imageRemain = tmemSrcLines - imageIY0;
+diff --git a/src/gbi/rt64_gbi_s2dex_slice.h b/src/gbi/rt64_gbi_s2dex_slice.h
+new file mode 100644
+--- /dev/null
++++ b/src/gbi/rt64_gbi_s2dex_slice.h
+@@ -0,0 +1,22 @@
++#pragma once
++#include <algorithm>
++#include <cstdint>
++
++namespace RT64::GBI_S2DEX {
++    struct BackgroundSlice {
++        int32_t sourceRow, phase, screenRows, sourceRows;
++    };
++
++    // Caller guarantees at least one whole screen row fits with the bilinear
++    // guard row. Source coordinates and scale are in 1/1024 texel units.
++    inline BackgroundSlice backgroundSlice(int64_t sourceY, int32_t sourceHeight,
++        int32_t remainingScreenRows, int32_t availableSourceRows, int32_t scale) {
++        const int64_t period = int64_t(sourceHeight) << 10;
++        sourceY = (sourceY % period + period) % period;
++        const int32_t phase = int32_t(sourceY & 1023);
++        const int32_t rows = std::min(remainingScreenRows,
++            ((availableSourceRows << 10) - phase) / scale);
++        return { int32_t(sourceY >> 10), phase, rows,
++            (phase + rows * scale + 1023) >> 10 };
++    }
++}

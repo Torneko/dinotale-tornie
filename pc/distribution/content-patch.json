@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "version": "0.15.0-beta.1",
+  "sourceSize": 16777216,
+  "targetSize": 16777216,
+  "sourceSha256": "e8a63388c38f8f0bea37e9b13a97f0898ac5496e08ca2028afb8db9a866e0ce9",
+  "targetSha256": "d5800ba53ceceb261048d72289805ed531e0f708916546febf7a41c22cdee87d",
+  "patchSha256": "f035de657f4892163007513a5d690bce6e486abe2f3e13925c4d601879d55860",
+  "engineSha256": "70ccc19e41a2c1c0342d39b34e24078fe2a20082f83946bf032816a6d7d3cd2f"
+}

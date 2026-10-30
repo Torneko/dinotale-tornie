@@ -1,0 +1,301 @@
+# These hooks belong only to the separate PC special-content build.
+# Exact native entry points keep vanilla cases on their original paths.
+
+# Respect the egg's own native color, including bounce/recolor transitions.
+# The old ROM helper unconditionally replaced it with the current hybrid.
+[[patches.hook]]
+func = "workshop_807F0600"
+before_vram = 0x807F0600
+text = "ctx->r24=S32(ctx->r5<<9);workshop_8003B8C8(rdram,ctx);return;"
+
+# Only the factory that asks for the current Yoshi's default egg substitutes
+# its extended display color. Enemy-colored eggs keep their chosen color.
+[[patches.hook]]
+func = "func_8003BA24"
+before_vram = 0x8003BA74
+text = "workshop_egg_default_color(rdram,ctx);"
+
+# A swallowed custom Maskass contributes its current six-color variant to
+# the same native egg factory used by the ordinary Maskass colors.
+[[patches.hook]]
+func = "func_800329B8"
+before_vram = 0x80032A24
+text = "workshop_egg_enemy_color(rdram,ctx);"
+
+# The native Lucky index stays in its safe four-entry range. Only the
+# consumption comparisons and explicit Lucky-fruit factories use the hybrid.
+[[patches.hook]]
+func = "func_80022360"
+before_vram = 0x80022384
+text = "if(workshop_hybrid_active())ctx->r4=workshop_hybrid_lucky_object();"
+
+[[patches.hook]]
+func = "func_8002B470"
+before_vram = 0x8002B4D8
+text = "if(workshop_hybrid_active())ctx->r11=workshop_hybrid_lucky_type();"
+[[patches.hook]]
+func = "func_8002B200"
+before_vram = 0x8002B328
+text = "if(workshop_hybrid_active())ctx->r24=workshop_hybrid_lucky_type();"
+[[patches.hook]]
+func = "func_807AF010"
+before_vram = 0x807AF030
+text = "if(workshop_hybrid_active())ctx->r24=workshop_hybrid_lucky_object();"
+[[patches.hook]]
+func = "func_804001DC"
+before_vram = 0x804006C0
+text = "if(workshop_hybrid_active())ctx->r12=workshop_hybrid_lucky_object();"
+
+# Follow the successful native ground-pound change, including its camera
+# and on-screen gates and sound, then advance the custom six-color cycle.
+[[patches.hook]]
+func = "func_800692D4"
+before_vram = 0x800694A8
+text = "workshop_hybrid_recolor(rdram,ctx);"
+
+# Preserve the ordinary records inside the physical EEPROM buffer while
+# retaining the hybrid records in RAM and in their own persistent sidecar.
+[[patches.hook]]
+func = "workshop_ext_eeprom_write"
+before_vram = 0x807F3CF4
+text = "if(!workshop_hybrid_records_save(rdram,ctx)){ctx->r2=1;ctx->r31=MEM_W(0x14,ctx->r29);ctx->r29=ADD32(ctx->r29,0x20);return;}"
+
+# An egg purchase authorizes the search; it does not grant the Yoshi. Keep
+# the completed-Trial requirement in Story and Trial before spawning either.
+[[patches.hook]]
+func = "func_80400118"
+before_vram = 0x80400118
+text = "if(workshop_egg_bubble_gate(rdram,ctx))return;"
+
+[[patches.hook]]
+func = "func_8003BC2C"
+before_vram = 0x8003BC2C
+text = "if(!workshop_egg_allowed(rdram,6)){ctx->r2=0;return;}"
+[[patches.hook]]
+func = "func_8003BBF4"
+before_vram = 0x8003BBF4
+text = "if(!workshop_egg_allowed(rdram,7)){ctx->r2=0;return;}"
+
+# Reward amounts are independent of the native food animation class. Keep
+# native clamping/combo logic while allowing the associated hybrid fruit +4
+# and the rounded mean of both component colors for consumed enemies.
+[[patches.hook]]
+func = "workshop_8002B520"
+before_vram = 0x8002B530
+text = "workshop_food_health(rdram,ctx);"
+
+[[patches.hook]]
+func = "func_8002B200"
+before_vram = 0x8002B220
+text = "workshop_food_score(rdram,ctx);"
+
+[[patches.hook]]
+func = "func_8002B200"
+before_vram = 0x8002B384
+text = "workshop_food_popup(rdram,ctx);"
+
+# Native kill scoring multiplies the base reward by 2, then applies its
+# existing combo growth. Read the victim's current properties (t0).
+[[patches.hook]]
+func = "workshop_8003D93C"
+before_vram = 0x8003D944
+text = "workshop_enemy_kill_reward(rdram,ctx);"
+
+# The new fourth-point bubble uses one queue item and the native animation.
+# Larger unsupported values retain multiple bubbles and their multipliers.
+[[patches.hook]]
+func = "func_8002B03C"
+before_vram = 0x8002B03C
+text = "if(workshop_split_reward_popup(rdram,ctx))return;"
+
+[[patches.hook]]
+func = "func_800431D8"
+before_vram = 0x80043230
+text = "if(ctx->r2==8)ctx->r2=4;"
+[[patches.hook]]
+func = "func_800431D8"
+before_vram = 0x800432D0
+text = "if(MEM_BU(0x1310,ctx->r10)==8){MEM_B(0x42,ctx->r29)=6;MEM_W(0x3C,ctx->r29)=4;}"
+[[patches.hook]]
+func = "func_800431D8"
+before_vram = 0x80043340
+text = "workshop_reward_popup_created(rdram,ctx);"
+
+# Name Entry cycles three complete chalk drawings. Keep its drawing stable;
+# preserve the chosen keyboard/layout, its transition and the cursor timers.
+[[patches.hook]]
+func = "func_80739A40"
+before_vram = 0x80739B08
+text = "ctx->r5=0;"
+
+# Pause's live mood estimate counted only eight native life flags. Use the
+# same earned/alive fourteen-color mask as the existing end-of-course tally.
+[[patches.hook]]
+func = "func_807B4A74"
+before_vram = 0x807B4AD4
+text = "workshop_pause_score_lives(rdram,ctx);"
+
+[[patches.hook]]
+func = "func_80050C8C"
+before_vram = 0x80050C8C
+text = "{ uint32_t id = ctx->r4 & 0xFFFF; if (id >= 0x4F00 && id < 0x4F06) { workshop_special_lookup_note(id); ctx->r5=id; ctx->r2 = (gpr)(int32_t)(0x807FC000 + (id - 0x4F00) * 12); return; } if (id == 0x4013 && workshop_use_special_hud()) { workshop_special_lookup_note(id); ctx->r5=id; ctx->r2 = (gpr)(int32_t)0x807FC048; return; } if (id == 0x4006) {ctx->r5=id;ctx->r2=(gpr)(int32_t)0x807FC054;return;} if(id==0x402C){ctx->r5=id;ctx->r2=(gpr)(int32_t)0x807FC060;return;} if(id==0x4016){ctx->r5=id;ctx->r2=(gpr)(int32_t)0x807FC06C;return;} }"
+
+[[patches.instruction]]
+func = "func_807B6778"
+vram = 0x807B679C
+value = 0x24050034
+
+[[patches.hook]]
+func = "workshop_807F0800"
+before_vram = 0x807F0800
+text = "workshop_pause_create(rdram,ctx); return;"
+
+[[patches.hook]]
+func = "workshop_807F0A00"
+before_vram = 0x807F0A00
+text = "workshop_pause_position(rdram,ctx);ctx->r31=MEM_W(0x14,ctx->r29);ctx->r29=ADD32(ctx->r29,0x20);return;"
+
+[[patches.hook]]
+func = "workshop_807F0D00"
+before_vram = 0x807F0D00
+text = "if(workshop_pause_frame(rdram,ctx)){workshop_807BA370(rdram,ctx);return;}"
+
+[[patches.hook]]
+func = "workshop_807F0C00"
+before_vram = 0x807F0C00
+text = "workshop_pause_hide(rdram,ctx);"
+
+# The beige transition creates actor 4006 using the native aliased color.
+# Select the extended display color after its native load, with 14 palettes.
+[[patches.hook]]
+func = "func_807BA478"
+before_vram = 0x807BA4E0
+text = "{ uint32_t color=MEM_W(0,(gpr)(int32_t)0x807F0008); if(color<14)ctx->r25=color; }"
+
+[[patches.hook]]
+func = "func_8002B088"
+before_vram = 0x8002B088
+text = "{ uint32_t id = MEM_HU(12, ctx->r4); if (id >= 0x4F00 && id < 0x4F06) { ctx->r2 = 6 + id - 0x4F00; return; } }"
+
+# The native spawn table has seven entries. Use its safe apple template;
+# the custom food bridge supplies the actual preferences when collected.
+[[patches.hook]]
+func = "func_80574A88"
+before_vram = 0x80574A88
+text = "if ((uint32_t)(ctx->r4 - 0x4F00) < 6) { ctx->r2 = 0; return; }"
+
+# World fruit initialization computes ID - 0x402D independently of the
+# food classifier. Custom IDs previously selected frames 3795..3800.
+# Each custom atlas contains the approved sprite in all nine slots; use
+# the native apple slot without changing the actor's food identity.
+[[patches.hook]]
+func = "func_805741B8"
+before_vram = 0x805741D8
+text = "if ((uint32_t)(ctx->r14 - 0x4F00) < 6) ctx->r15 = 3;"
+
+# Register all six resources before the native loader scans gameplay objects.
+# A fruit may be created inside a bubble or by an enemy later in the room.
+# Custom editor payloads keep their exact chosen fruit placements.
+[[patches.hook]]
+func = "func_80051418"
+before_vram = 0x80051450
+text = "workshop_mix_level(rdram,ctx);"
+
+# The fruit factory is shared by placed fruit, bubble contents and rewards.
+# Choose once when creating the actual fruit; retain source placement data.
+[[patches.hook]]
+func = "func_80574B44"
+before_vram = 0x80574B6C
+text = "ctx->r5=workshop_mix_spawn(rdram,ctx);"
+
+# Clear a container's saved choice only when its actor is initialized again;
+# pooled addresses can then be used by a genuinely new fruit source.
+# Pooled fruit also need a fresh resource binding when crossing hybrid atlases.
+[[patches.hook]]
+func = "func_80045CAC"
+before_vram = 0x80045CAC
+text = "workshop_mix_parent_created((uint32_t)ctx->r4); workshop_prepare_fruit_resource(rdram,ctx);"
+
+# The reused actor already has render state, whose borrowed palette/texture
+# still belong to the preceding fruit. Refresh it after native initialization.
+[[patches.hook]]
+func = "func_80045CAC"
+before_vram = 0x80046004
+text = "if (ctx->r2) workshop_finish_fruit_resource(rdram,ctx);"
+
+# Keep a distinct fruit type (6..11) in the native ring and tally arrays.
+[[patches.hook]]
+func = "func_80573F94"
+before_vram = 0x80573FDC
+text = "if ((uint32_t)(ctx->r2 - 0x4F00) < 6) ctx->r4 = 6 + ctx->r2 - 0x4F00;"
+
+[[patches.hook]]
+func = "workshop_807F1500"
+before_vram = 0x807F1500
+text = "if (workshop_special_food(rdram, ctx)) { workshop_807F016C(rdram, ctx); return; }"
+
+# The original 150-entry ROM resource cache fills while preloading the six
+# additional fruit definitions. Move its two arrays into reserved extension
+# RAM (outside game heaps/code), and grow them together to 512 entries.
+[[patches.instruction]]
+func = "func_800505F0"
+vram = 0x800505F8
+value = 0x3C048080
+[[patches.instruction]]
+func = "func_800505F0"
+vram = 0x800505FC
+value = 0x24848000
+[[patches.instruction]]
+func = "func_800505F0"
+vram = 0x80050600
+value = 0x24051800
+[[patches.instruction]]
+func = "func_800505F0"
+vram = 0x80050610
+value = 0x3C058080
+[[patches.instruction]]
+func = "func_800505F0"
+vram = 0x80050614
+value = 0x24A59800
+[[patches.instruction]]
+func = "func_800505F0"
+vram = 0x80050620
+value = 0x24060200
+[[patches.instruction]]
+func = "func_80050790"
+vram = 0x800507AC
+value = 0x24010200
+[[patches.instruction]]
+func = "func_80050790"
+vram = 0x800507D8
+value = 0x3C0F8080
+[[patches.instruction]]
+func = "func_80050790"
+vram = 0x800507DC
+value = 0x25EF8000
+[[patches.hook]]
+func = "func_800579E4"
+before_vram = 0x800579E4
+text = "if (workshop_resource_slot(rdram,ctx,0)) return;"
+[[patches.hook]]
+func = "func_80057AC0"
+before_vram = 0x80057AC0
+text = "if (workshop_resource_slot(rdram,ctx,1)) return;"
+
+# Bounded diagnostic fixtures only; these helpers do nothing in ordinary play.
+[[patches.hook]]
+func = "func_800436E0"
+before_vram = 0x8004381C
+text = "workshop_test_level_start(rdram,ctx);"
+[[patches.hook]]
+func = "func_800245A0"
+before_vram = 0x800245A0
+text = "workshop_palette_note(rdram,ctx,0);"
+[[patches.hook]]
+func = "func_8004590C"
+before_vram = 0x8004590C
+text = "workshop_palette_note(rdram,ctx,1);"
+[[patches.hook]]
+func = "Fault_HungUp"
+before_vram = 0x80071380
+text = "workshop_native_fault(rdram,ctx);"
