@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 300" fill="none">
+<ellipse cx="178" cy="254" rx="131" ry="15" fill="#111c16" opacity=".45"/>
+<path d="m38 188 130 9 125-24 7 64-127 30-132-17Z" fill="#263d30" stroke="#70876a" stroke-width="1.5"/>
+<path d="m37 176 132 15 122-29 4 63-124 29-131-17Z" fill="#34493a" stroke="#789376" stroke-width="1.5"/>
+<path d="m44 177 123 12 119-26-1 50-115 26-124-15Z" fill="#405746"/>
+<path d="m169 191 1 49m-114-6 100 12m31-6 94-21m-225 7 97 12m34-6 94-21" stroke="#90a17d" stroke-width="1.6" opacity=".65"/>
+<path d="m48 172 119 15 116-27-112-18Z" fill="#50654d" stroke="#8a9e7b" stroke-width="1.5"/>
+<path d="m169 187 2-45" stroke="#a9b791" stroke-width="2"/>
+<g transform="rotate(-17 112 146)"><path d="M111 98c-18 0-32 33-32 51 0 24 15 37 33 37s33-14 33-37c0-20-16-51-34-51Z" fill="#d8d9d0"/><ellipse cx="103" cy="119" rx="9" ry="12" fill="#a899bd" transform="rotate(20 103 119)"/><ellipse cx="130" cy="148" rx="10" ry="13" fill="#a899bd"/><ellipse cx="97" cy="171" rx="12" ry="8" fill="#a899bd"/></g>
+<g transform="rotate(17 242 139)"><path d="M241 95c-17 0-30 30-30 48 0 21 14 34 31 34s30-13 30-34c0-18-14-48-31-48Z" fill="#dfdacb"/><ellipse cx="234" cy="116" rx="8" ry="11" fill="#bd947c"/><ellipse cx="258" cy="145" rx="8" ry="12" fill="#bd947c"/><ellipse cx="230" cy="160" rx="10" ry="9" fill="#bd947c"/></g>
+<path d="M176 64c-25 0-47 46-47 75 0 32 21 52 48 52s47-21 47-52c0-29-22-75-48-75Z" fill="#e0e5cf"/>
+<path d="M191 72c14 17 25 43 25 65 0 28-17 47-41 49 28 1 49-19 49-47 0-26-15-58-33-67Z" fill="#bdcca8" opacity=".6"/>
+<ellipse cx="159" cy="103" rx="12" ry="17" fill="#8ead77" transform="rotate(27 159 103)"/>
+<ellipse cx="204" cy="133" rx="13" ry="18" fill="#8ead77" transform="rotate(-15 204 133)"/>
+<ellipse cx="154" cy="166" rx="17" ry="11" fill="#8ead77" transform="rotate(23 154 166)"/>
+<path d="m71 57 3 9 9 3-9 3-3 9-3-9-9-3 9-3Zm198 4 2 6 6 2-6 2-2 6-2-6-6-2 6-2Z" fill="#aebc9c" opacity=".7"/>
+<circle cx="274" cy="101" r="3" fill="#b5a6c8" opacity=".7"/>
+</svg>
