@@ -28,7 +28,9 @@ public sealed class Placement {
 
     public int? HybridVariant { get; set; }
 
-    public Placement Copy() => new() { ObjectId=ObjectId, Layer=Layer, X=X, Y=Y, HybridVariant=HybridVariant };
+    public PassageOverride? Passage { get; set; }
+
+    public Placement Copy() => new() { ObjectId=ObjectId, Layer=Layer, X=X, Y=Y, HybridVariant=HybridVariant, Passage=Passage is null?null:Passage with{} };
 
 }
 
@@ -46,9 +48,15 @@ public sealed class LevelProject {
 
     public string Icon { get; set; } = "";
 
+    public int? MusicId { get; set; }
+
+    public RoomEntry? Entry { get; set; }
+
     public List<Placement> Objects { get; set; } = [];
 
     public List<RoomProject> Rooms { get; set; } = [];
+
+    public List<TerrainCellChange> Terrain { get; set; } = [];
 
 }
 
@@ -176,7 +184,13 @@ public sealed class ProjectStore(string root) {
 
         var copy=JsonSerializer.Deserialize<LevelProject>(JsonSerializer.Serialize(source,Json),Json)!;
 
-        copy.Id=Guid.NewGuid().ToString("N"); copy.Name=source.Name+" — copie"; copy.Icon="";
+        const string copySuffix=" \u2014 copie";
+
+        int prefixLength=Math.Min(source.Name.Length,100-copySuffix.Length);
+
+        if(prefixLength>0 && char.IsHighSurrogate(source.Name[prefixLength-1]))prefixLength--;
+
+        copy.Id=Guid.NewGuid().ToString("N"); copy.Name=source.Name[..prefixLength]+copySuffix; copy.Icon="";
 
         foreach (var room in copy.AllRooms())foreach(var item in room.Objects)item.Id=Guid.NewGuid().ToString("N");
 
@@ -186,11 +200,12 @@ public sealed class ProjectStore(string root) {
 
     public static void Validate(LevelProject level) {
         ValidateId(level.Id);
-        if(level.Schema is not (1 or 2) || level.SourceSha256!=VanillaRom.ExpectedSha256 || VanillaRom.SourceStage(level.SourceZone)<0 || (level.Schema==1 && level.Rooms.Count!=0))throw new InvalidDataException("Format ou source de niveau invalide.");
+        if(level.Schema is not (1 or 2 or 3 or 4 or 5) || level.SourceSha256!=VanillaRom.ExpectedSha256 || VanillaRom.SourceStage(level.SourceZone)<0 || (level.Schema==1 && level.Rooms.Count!=0))throw new InvalidDataException("Format ou source de niveau invalide.");
         if(string.IsNullOrWhiteSpace(level.Name) || level.Name.Length>100)throw new InvalidDataException("Nom de niveau requis (100 caractères maximum).");
         var rooms=level.AllRooms().ToList();
         if(rooms.Count>10 || rooms.Select(r=>r.SourceZone).Distinct().Count()!=rooms.Count || rooms.Any(r=>!NativeRooms.Contains(level.SourceZone,r.SourceZone)))throw new InvalidDataException("Une salle n’appartient pas à ce niveau ou apparaît plusieurs fois.");
         if(rooms.Sum(r=>r.Objects.Count)>6000)throw new InvalidDataException("Le niveau dépasse 6000 objets au total.");
+        TerrainEditing.ValidateStructure(level);RoomMusic.Validate(level);NavigationEditing.ValidateShape(level);
         var keys=new HashSet<string>();
         foreach(var room in rooms){
             if(room.Objects.Count is <1 or >RoomProject.MaxObjects || room.Objects.Count(p=>p.ObjectId==0x4001)!=1)throw new InvalidDataException("Chaque salle doit garder exactement un départ de Yoshi et contenir entre 1 et 149 objets.");
@@ -278,13 +293,13 @@ public sealed partial class VanillaRom {
 
     public LevelProject CloneLevel(int zone,bool allRooms=true){var source=Original(zone);var copy=System.Text.Json.JsonSerializer.Deserialize<LevelProject>(System.Text.Json.JsonSerializer.Serialize(source,ProjectStore.Json),ProjectStore.Json)!;copy.Id=Guid.NewGuid().ToString("N");foreach(var o in copy.Objects)o.Id=Guid.NewGuid().ToString("N");if(allRooms)IncludeOriginalRooms(copy);return copy;}
 
-    public IReadOnlySet<ushort> SourceObjects(int zone)=>ReadRoom(zone).Objects.Select(o=>o.ObjectId).ToHashSet();
+    public IReadOnlySet<ushort> SourceObjects(int zone){var allowed=ReadRoom(zone).Objects.Select(o=>o.ObjectId).ToHashSet();if(CanPlaceBlackFlyGuy(zone))allowed.Add(0x45E3);return allowed;}
 
     public IEnumerable<ushort> Palette(int zone,bool special){
 
-        var ids=SourceObjects(zone).Where(id=>id<0x8000 && id!=0x4001);
+        var ids=SourceObjects(zone).Where(id=>id<0x8000 && id!=0x4001 && (special || id!=0x45E3));
 
-        if(special){ids=ids.Concat(ObjectCatalog.SpecialFruits);if(ReadRoom(zone).Objects.Any(p=>ObjectCatalog.IsMaskass(p.ObjectId)))ids=ids.Concat(ObjectCatalog.SpecialMaskass);}
+        if(special){if(SpecialEditorObjects.Compatible(SourceObjects(zone)))ids=ids.Concat(SpecialEditorObjects.Eggs);ids=ids.Concat(ObjectCatalog.SpecialFruits);if(SourceObjects(zone).Any(ObjectCatalog.IsFruitBubble))ids=ids.Concat(ObjectCatalog.SpecialBubbles);if(ReadRoom(zone).Objects.Any(p=>ObjectCatalog.IsMaskass(p.ObjectId)))ids=ids.Concat(ObjectCatalog.SpecialMaskass);}
 
         return ids.Distinct().OrderBy(id=>ObjectCatalog.Get(id).Name);
 
@@ -294,11 +309,12 @@ public sealed partial class VanillaRom {
 
         var objects=ReadRoom(sourceZone).Objects;bool hybrid=ObjectCatalog.IsSpecialMaskass(id);
 
-        var template=hybrid?objects.FirstOrDefault(p=>p.ObjectId==0x403A)??objects.FirstOrDefault(p=>ObjectCatalog.IsMaskass(p.ObjectId)):
+        var template=id==0x45E3 && CanPlaceBlackFlyGuy(sourceZone)?objects.First(p=>p.ObjectId==0x45E5):SpecialEditorObjects.IsEgg(id)?objects.FirstOrDefault(p=>p.ObjectId==SpecialEditorObjects.Alias(objects.Select(o=>o.ObjectId))):hybrid?objects.FirstOrDefault(p=>p.ObjectId==0x403A)??objects.FirstOrDefault(p=>ObjectCatalog.IsMaskass(p.ObjectId)):
 
+            ObjectCatalog.IsSpecialBubble(id)?objects.Where(p=>ObjectCatalog.IsFruitBubble(p.ObjectId)).OrderBy(p=>p.ObjectId).FirstOrDefault():
             ObjectCatalog.IsSpecialFruit(id)?objects.FirstOrDefault(p=>p.ObjectId is >=0x4030 and <=0x4034):objects.FirstOrDefault(p=>p.ObjectId==id);
 
-        if(template==null)throw new InvalidDataException("Cet objet ne possède pas de modèle compatible avec cette source.");
+        if(template==null)throw new InvalidDataException($"L’objet {ObjectCatalog.Get(id).Name} ne possède pas de modèle compatible dans {SourceCode(sourceZone)}.");
 
         var p=template.Copy();if(hybrid)p.HybridVariant=id-0x4F10;else p.ObjectId=id;return p;
 
@@ -306,13 +322,24 @@ public sealed partial class VanillaRom {
 
     void ValidateResources(LevelProject level,bool special){
         ProjectStore.Validate(level);
+        ValidateTerrain(level);
+        ValidateNavigation(level);
+        if(!special && NavigationEditing.HasEdits(level))throw new InvalidDataException("Les passages et entrées modifiés nécessitent le moteur personnalisé.");
         foreach(var room in level.AllRooms()){var original=ReadRoom(room.SourceZone).Objects.Single(p=>p.ObjectId==0x4001);var spawn=room.Objects.Single(p=>p.ObjectId==0x4001);
-            if(spawn.X!=original.X || spawn.Y!=original.Y || spawn.Layer!=original.Layer)throw new InvalidDataException("Conserve le point d’entrée d’origine de chaque salle. Le bouton de rétablissement permet de le récupérer sans toucher aux autres objets.");var allowed=SourceObjects(room.SourceZone);
-            if(room.Objects.Any(p=>(!allowed.Contains(p.ObjectId) && !(special && ObjectCatalog.IsSpecialFruit(p.ObjectId))) || (!special && p.HybridVariant.HasValue)))throw new InvalidDataException("Un objet n’est pas compatible avec les ressources de sa salle.");
+            if(spawn.Layer!=original.Layer || (room.Entry is null && (spawn.X!=original.X || spawn.Y!=original.Y)) || (room.Entry is not null && (spawn.X!=room.Entry.X || spawn.Y!=room.Entry.Y)))throw new InvalidDataException("Conserve le point d’entrée d’origine de chaque salle. Le bouton de rétablissement permet de le récupérer sans toucher aux autres objets.");var allowed=SourceObjects(room.SourceZone);
+            var nativeEggAlias=SpecialEditorObjects.Alias(allowed);var nativeEggLayer=ReadRoom(room.SourceZone).Objects.FirstOrDefault(p=>p.ObjectId==nativeEggAlias)?.Layer;
+            if(room.Objects.Any(p=>SpecialEditorObjects.IsEgg(p.ObjectId) && (!nativeEggLayer.HasValue || p.Layer!=nativeEggLayer.Value)))throw new InvalidDataException("Conserver les paramètres natifs de la bulle d’œuf.");
+            if(!special && room.Objects.Any(p=>p.ObjectId==0x45E3))throw new InvalidDataException("Le Maskass noir seul nécessite le moteur personnalisé.");
+            if(room.Objects.Where(p=>p.ObjectId is 0x45E3 or 0x45E5).GroupBy(p=>(p.Layer,p.X,p.Y)).Any(g=>g.Count()>1 && g.Any(p=>p.ObjectId==0x45E3)))throw new InvalidDataException("Les Maskass noirs seuls et les blocs à piquants doivent être séparés.");
+            var eggGroups=room.Objects.Where(p=>SpecialEditorObjects.IsEgg(p.ObjectId) || SpecialEditorObjects.NativeEgg(p.ObjectId)).GroupBy(p=>(p.Layer,p.X,p.Y));
+            if(eggGroups.Any(g=>g.Count()>1 && g.Any(p=>SpecialEditorObjects.IsEgg(p.ObjectId))))throw new InvalidDataException("Les bulles d’œufs spéciales doivent être séparées les unes des autres.");
+            var bubbleGroups=room.Objects.Where(p=>ObjectCatalog.IsSpecialBubble(p.ObjectId) || ObjectCatalog.IsFruitBubble(p.ObjectId)).GroupBy(p=>(p.Layer,p.X,p.Y));
+            if(bubbleGroups.Any(g=>g.Any(p=>ObjectCatalog.IsSpecialBubble(p.ObjectId)) && (g.Select(p=>p.ObjectId).Distinct().Count()>1)))throw new InvalidDataException("Les bulles superposées doivent contenir le même fruit.");
+            if(room.Objects.Any(p=>(!allowed.Contains(p.ObjectId) && !(special && (ObjectCatalog.IsSpecialFruit(p.ObjectId) || SpecialEditorObjects.IsEgg(p.ObjectId) && SpecialEditorObjects.Compatible(allowed) || ObjectCatalog.IsSpecialBubble(p.ObjectId) && allowed.Any(ObjectCatalog.IsFruitBubble)))) || (!special && p.HybridVariant.HasValue)))throw new InvalidDataException("Un objet n’est pas compatible avec les ressources de sa salle.");
         }
     }
 
-    public byte[] BuildDataOnly(LevelProject level){ValidateResources(level,false);return BuildRooms(level);}
+    public byte[] BuildDataOnly(LevelProject level,bool specialContent=false){ValidateResources(level,specialContent);return BuildRooms(level);}
     public byte[] ExportPlacements(LevelProject level,bool specialContent=false){ValidateResources(level,specialContent);return ExportRooms(level);}
 
 }

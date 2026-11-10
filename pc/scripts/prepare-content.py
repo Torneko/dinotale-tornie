@@ -44,4 +44,5 @@ for script in ('fix-content-link-register.py','trace-special-startup.py'):subpro
 expected=json.loads((pc/'recompile/generated-sha256.json').read_text(encoding='utf-8'))
 actual={f.name:sha(f.read_bytes().replace(b'\r\n',b'\n')) for f in (out/'RecompiledFuncs').iterdir() if f.is_file()}
 assert actual==expected,'Generated functions differ from this release'
-print('Content and all generated sources verified; ready for native CMake build.')
+subprocess.run([sys.executable,str(pc/'scripts/apply-native-hooks0340.py'),str(out)],check=True)
+print('Content and release0.34.0 generated sources verified; ready for native CMake build.')

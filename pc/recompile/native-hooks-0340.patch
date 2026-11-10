@@ -1,0 +1,2000 @@
+diff --git a/funcs_10.c b/funcs_10.c
+index d558298..febfb37 100644
+--- a/funcs_10.c
++++ b/funcs_10.c
+@@ -4342,9 +4342,13 @@ L_80022434:
+     // 0x80022444: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_80022448(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80022448(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80022448");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_105.c b/funcs_105.c
+index 3509428..ede0d5f 100644
+--- a/funcs_105.c
++++ b/funcs_105.c
+@@ -1579,11 +1579,11 @@ RECOMP_FUNC void func_804A0548(uint8_t* rdram, recomp_context* ctx) {
+     // 0x804A0580: jal         0x80045A34
+     ctx->r31 = ADD32(section_addresses[57], 0x148); /* workshop: preserve MIPS link before delay slot */
+     // 0x804A0584: addiu       $a1, $zero, 0x44
+-    ctx->r5 = ADD32(0, 0X44);
++    ctx->r5 = ADD32(0, 0X4C);
+     func_80045A34(rdram, ctx);
+         goto after_1;
+     // 0x804A0584: addiu       $a1, $zero, 0x44
+-    ctx->r5 = ADD32(0, 0X44);
++    ctx->r5 = ADD32(0, 0X4C);
+     after_1:
+     // 0x804A0588: sw          $v0, 0x1F4($s0)
+     MEM_W(0X1F4, ctx->r16) = ctx->r2;
+@@ -1706,7 +1706,7 @@ RECOMP_FUNC void func_804A0610(uint8_t* rdram, recomp_context* ctx) {
+     NAN_CHECK(ctx->f10.fl); NAN_CHECK(ctx->f6.fl); 
+     ctx->f10.fl = ctx->f10.fl + ctx->f6.fl;
+     // 0x804A0628: addiu       $t1, $zero, 0xD
+-    ctx->r9 = ADD32(0, 0XD);
++    ctx->r9 = ADD32(0, 0XF);
+ L_804A062C:
+     // 0x804A062C: lw          $t0, 0x0($a0)
+     ctx->r8 = MEM_W(ctx->r4, 0X0);
+@@ -2192,7 +2192,7 @@ RECOMP_FUNC void func_804A0954(uint8_t* rdram, recomp_context* ctx) {
+     NAN_CHECK(ctx->f10.fl); NAN_CHECK(ctx->f6.fl); 
+     ctx->f10.fl = ctx->f10.fl - ctx->f6.fl;
+     // 0x804A096C: addiu       $t1, $zero, 0xD
+-    ctx->r9 = ADD32(0, 0XD);
++    ctx->r9 = ADD32(0, 0XF);
+ L_804A0970:
+     // 0x804A0970: lw          $t0, 0x0($a0)
+     ctx->r8 = MEM_W(ctx->r4, 0X0);
+@@ -2678,7 +2678,7 @@ RECOMP_FUNC void func_804A0C98(uint8_t* rdram, recomp_context* ctx) {
+     NAN_CHECK(ctx->f8.fl); NAN_CHECK(ctx->f4.fl); 
+     ctx->f8.fl = ctx->f8.fl + ctx->f4.fl;
+     // 0x804A0CB0: addiu       $t1, $zero, 0xD
+-    ctx->r9 = ADD32(0, 0XD);
++    ctx->r9 = ADD32(0, 0XF);
+ L_804A0CB4:
+     // 0x804A0CB4: lw          $t0, 0x0($a0)
+     ctx->r8 = MEM_W(ctx->r4, 0X0);
+@@ -3164,7 +3164,7 @@ RECOMP_FUNC void func_804A0FDC(uint8_t* rdram, recomp_context* ctx) {
+     NAN_CHECK(ctx->f8.fl); NAN_CHECK(ctx->f4.fl); 
+     ctx->f8.fl = ctx->f8.fl - ctx->f4.fl;
+     // 0x804A0FF4: addiu       $t1, $zero, 0xD
+-    ctx->r9 = ADD32(0, 0XD);
++    ctx->r9 = ADD32(0, 0XF);
+ L_804A0FF8:
+     // 0x804A0FF8: lw          $t0, 0x0($a0)
+     ctx->r8 = MEM_W(ctx->r4, 0X0);
+@@ -3849,7 +3849,7 @@ RECOMP_FUNC void func_804A1404(uint8_t* rdram, recomp_context* ctx) {
+     // 0x804A1450: addiu       $v0, $t1, 0xC
+     ctx->r2 = ADD32(ctx->r9, 0XC);
+     // 0x804A1454: addiu       $v1, $zero, 0xE
+-    ctx->r3 = ADD32(0, 0XE);
++    ctx->r3 = ADD32(0, 0X10);
+ L_804A1458:
+     // 0x804A1458: sw          $zero, 0x0($v0)
+     MEM_W(0X0, ctx->r2) = 0;
+diff --git a/funcs_106.c b/funcs_106.c
+index e27de47..74d7168 100644
+--- a/funcs_106.c
++++ b/funcs_106.c
+@@ -3871,7 +3871,7 @@ L_804A4874:
+     // 0x804A4AF8: lui         $at, 0x8010
+     ctx->r1 = S32(0X8010 << 16);
+     // 0x804A4AFC: addu        $t7, $zero, $zero
+-    ctx->r15 = ADD32(0, 0);
++    ctx->r15 = ctx->r15 == 14 ? 6 : ctx->r15 == 15 ? 7 : 0;
+ L_804A4B00:
+     // 0x804A4B00: sw          $t7, -0x7250($at)
+     MEM_W(-0X7250, ctx->r1) = ctx->r15;
+diff --git a/funcs_11.c b/funcs_11.c
+index 1d24ee2..3195833 100644
+--- a/funcs_11.c
++++ b/funcs_11.c
+@@ -550,9 +550,13 @@ L_800233A8:
+     // 0x800233B0: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_800233B4(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_800233B4(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_800233B4");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -1576,9 +1580,13 @@ RECOMP_FUNC void func_8002381C(uint8_t* rdram, recomp_context* ctx) {
+     // 0x80023878: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_8002387C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8002387C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8002387C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_118.c b/funcs_118.c
+index f97f8ec..f66c459 100644
+--- a/funcs_118.c
++++ b/funcs_118.c
+@@ -3475,9 +3475,13 @@ RECOMP_FUNC void func_804F42A0(uint8_t* rdram, recomp_context* ctx) {
+     // 0x804F42B4: sw          $t6, 0x28($t8)
+     MEM_W(0X28, ctx->r24) = ctx->r14;
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void blargg_original_func_804F42B8(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_804F42B8(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_804F42B8");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -4220,9 +4224,13 @@ L_804F454C:
+     // 0x804F46E0: addiu       $sp, $sp, 0x68
+     ctx->r29 = ADD32(ctx->r29, 0X68);
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void blargg_original_func_804F46E4(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_804F46E4(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_804F46E4");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -7306,9 +7314,13 @@ L_804F570C:
+     // 0x804F5718: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void blargg_original_func_804F571C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_804F571C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_804F571C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -7452,9 +7464,13 @@ L_804F57D4:
+     // 0x804F57E0: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void blargg_original_func_804F57E4(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_804F57E4(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_804F57E4");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_119.c b/funcs_119.c
+index 7e851a6..09c3865 100644
+--- a/funcs_119.c
++++ b/funcs_119.c
+@@ -907,9 +907,13 @@ L_804F5CDC:
+     // 0x804F5CE4: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void blargg_original_func_804F5CE8(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_804F5CE8(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_804F5CE8");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_130.c b/funcs_130.c
+index 9cb1f59..90ef336 100644
+--- a/funcs_130.c
++++ b/funcs_130.c
+@@ -2118,9 +2118,13 @@ RECOMP_FUNC void func_805548D8(uint8_t* rdram, recomp_context* ctx) {
+     // 0x80554924: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_80554928(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80554928(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80554928");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -7967,9 +7971,13 @@ L_80557D34:
+     // 0x80557D40: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_80557D44(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80557D44(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80557D44");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -9591,9 +9599,13 @@ RECOMP_FUNC void func_80558624(uint8_t* rdram, recomp_context* ctx) {
+     // 0x80558638: sw          $t6, 0x28($t8)
+     MEM_W(0X28, ctx->r24) = ctx->r14;
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_8055863C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8055863C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8055863C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_134.c b/funcs_134.c
+index c066220..026595a 100644
+--- a/funcs_134.c
++++ b/funcs_134.c
+@@ -3100,9 +3100,13 @@ L_80574B3C:
+     // 0x80574B40: or          $v0, $v1, $zero
+     ctx->r2 = ctx->r3 | 0;
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_80574B44(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80574B44(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80574B44");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_135.c b/funcs_135.c
+index e282082..9725121 100644
+--- a/funcs_135.c
++++ b/funcs_135.c
+@@ -3002,7 +3002,7 @@ RECOMP_FUNC void func_8057D750(uint8_t* rdram, recomp_context* ctx) {
+     // 0x8057D75C: mtc1        $a2, $f12
+     ctx->f12.u32l = ctx->r6;
+     // 0x8057D760: lhu         $t8, -0x2434($t8)
+-    ctx->r24 = MEM_HU(ctx->r24, (int16_t)RELOC_LO16(129, 0X48C));
++    ctx->r24 = MEM_HU(0, ADD32(S32(0x807FD200u), ctx->r15));
+     // 0x8057D764: addiu       $sp, $sp, -0x20
+     ctx->r29 = ADD32(ctx->r29, -0X20);
+     // 0x8057D768: sll         $v0, $a1, 2
+@@ -3030,15 +3030,15 @@ RECOMP_FUNC void func_8057D750(uint8_t* rdram, recomp_context* ctx) {
+     // 0x8057D794: or          $a0, $t9, $t0
+     ctx->r4 = ctx->r25 | ctx->r8;
+     // 0x8057D798: lw          $a1, -0x2418($a1)
+-    ctx->r5 = MEM_W(ctx->r5, (int16_t)RELOC_LO16(129, 0X4A8));
++    ctx->r5 = MEM_W(0, ADD32(S32(0x807FD220u), ctx->r2));
+     // 0x8057D79C: jal         0x8004613C
+     ctx->r31 = ADD32(section_addresses[129], 0x64); /* workshop: preserve MIPS link before delay slot */
+     // 0x8057D7A0: lw          $a2, -0x23E0($a2)
+-    ctx->r6 = MEM_W(ctx->r6, (int16_t)RELOC_LO16(129, 0X4E0));
++    ctx->r6 = MEM_W(0, ADD32(S32(0x807FD260u), ctx->r2));
+     func_8004613C(rdram, ctx);
+         goto after_0;
+     // 0x8057D7A0: lw          $a2, -0x23E0($a2)
+-    ctx->r6 = MEM_W(ctx->r6, (int16_t)RELOC_LO16(129, 0X4E0));
++    ctx->r6 = MEM_W(0, ADD32(S32(0x807FD260u), ctx->r2));
+     after_0:
+     // 0x8057D7A4: sw          $v0, 0x1C($sp)
+     MEM_W(0X1C, ctx->r29) = ctx->r2;
+@@ -3128,11 +3128,11 @@ L_8057D81C:
+     // 0x8057D820: beq         $t6, $zero, L_8057D8A4
+     if (ctx->r14 == 0) {
+         // 0x8057D824: slti        $at, $s0, 0xE
+-        ctx->r1 = SIGNED(ctx->r16) < 0XE ? 1 : 0;
++        ctx->r1 = SIGNED(ctx->r16) < 0X10 ? 1 : 0;
+             goto L_8057D8A4;
+     }
+     // 0x8057D824: slti        $at, $s0, 0xE
+-    ctx->r1 = SIGNED(ctx->r16) < 0XE ? 1 : 0;
++    ctx->r1 = SIGNED(ctx->r16) < 0X10 ? 1 : 0;
+     // 0x8057D828: bne         $at, $zero, L_8057D898
+     if (ctx->r1 != 0) {
+         // 0x8057D82C: or          $a0, $s3, $zero
+@@ -3249,7 +3249,7 @@ L_8057D8A4:
+     ctx->r16 = ADD32(ctx->r16, 0X1);
+ L_8057D8A8:
+     // 0x8057D8A8: slti        $at, $s0, 0xE
+-    ctx->r1 = SIGNED(ctx->r16) < 0XE ? 1 : 0;
++    ctx->r1 = SIGNED(ctx->r16) < 0X10 ? 1 : 0;
+     // 0x8057D8AC: bne         $at, $zero, L_8057D81C
+     if (ctx->r1 != 0) {
+         // 0x8057D8B0: srl         $s1, $s1, 1
+diff --git a/funcs_142.c b/funcs_142.c
+index be58c1d..8563994 100644
+--- a/funcs_142.c
++++ b/funcs_142.c
+@@ -651,9 +651,13 @@ L_805A5614:
+     // 0x805A5624: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805A5628(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805A5628(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805A5628");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -1159,9 +1163,13 @@ L_805A5898:
+     // 0x805A58A8: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805A58AC(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805A58AC(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805A58AC");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -3967,9 +3975,13 @@ RECOMP_FUNC void func_805A65D8(uint8_t* rdram, recomp_context* ctx) {
+     // 0x805A65FC: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805A6600(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805A6600(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805A6600");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_144.c b/funcs_144.c
+index a1dfaaa..8bea1a6 100644
+--- a/funcs_144.c
++++ b/funcs_144.c
+@@ -1,9 +1,13 @@
+ #include "recomp.h"
+ #include "funcs.h"
+ 
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_805AAF8C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805AAF8C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805AAF8C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -91,6 +95,11 @@ L_805AAFD0:
+ 
+     // 0x805AB004: lh          $t8, 0xAE0($t1)
+     ctx->r24 = MEM_H(ctx->r9, 0XAE0);
++#if defined(WORKSHOP_NATIVE_COOP)
++    /* COOP_POT_AXIS_READ0280: per-candidate native owner input read. */
++    extern int32_t workshop_coop_pot_axis(uint8_t*,recomp_context*,uint32_t,int32_t);
++    ctx->r24 = (int64_t)workshop_coop_pot_axis(rdram,ctx,(uint32_t)ctx->r2,(int32_t)ctx->r24);
++#endif
+     // 0x805AB008: slti        $at, $t8, -0x27
+     ctx->r1 = SIGNED(ctx->r24) < -0X27 ? 1 : 0;
+     // 0x805AB00C: beq         $at, $zero, L_805AB084
+@@ -739,9 +748,13 @@ L_805AB2F8:
+     // 0x805AB304: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_805AB308(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805AB308(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805AB308");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -1117,9 +1130,13 @@ L_805AB4C4:
+     // 0x805AB4D4: addiu       $sp, $sp, 0x20
+     ctx->r29 = ADD32(ctx->r29, 0X20);
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_805AB4D8(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805AB4D8(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805AB4D8");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -2209,9 +2226,13 @@ L_805ABBE0:
+     // 0x805ABBE4: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_805ABBE8(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805ABBE8(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805ABBE8");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_146.c b/funcs_146.c
+index 5fb886f..524cf07 100644
+--- a/funcs_146.c
++++ b/funcs_146.c
+@@ -755,9 +755,13 @@ RECOMP_FUNC void func_805C64F0(uint8_t* rdram, recomp_context* ctx) {
+     // 0x805C64FC: sw          $a0, 0x0($sp)
+     MEM_W(0X0, ctx->r29) = ctx->r4;
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805C6500(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805C6500(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805C6500");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -1388,9 +1392,13 @@ RECOMP_FUNC void func_805C68E8(uint8_t* rdram, recomp_context* ctx) {
+     // 0x805C68FC: sw          $t6, 0x28($t8)
+     MEM_W(0X28, ctx->r24) = ctx->r14;
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805C6900(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805C6900(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805C6900");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -3970,9 +3978,13 @@ L_805C74B4:
+     // 0x805C74C4: addiu       $sp, $sp, 0x48
+     ctx->r29 = ADD32(ctx->r29, 0X48);
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805C74C8(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805C74C8(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805C74C8");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -5400,9 +5412,13 @@ L_805C7BFC:
+     // 0x805C7C00: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805C7C04(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805C7C04(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805C7C04");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -5439,9 +5455,13 @@ RECOMP_FUNC void func_805C7C04(uint8_t* rdram, recomp_context* ctx) {
+     // 0x805C7C28: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805C7C2C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805C7C2C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805C7C2C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -6450,9 +6470,13 @@ L_805C8130:
+     // 0x805C813C: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805C8140(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805C8140(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805C8140");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -6627,9 +6651,13 @@ L_805C8210:
+     // 0x805C823C: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805C8240(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805C8240(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805C8240");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -6725,9 +6753,13 @@ L_805C82A4:
+     // 0x805C82BC: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805C82C0(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805C82C0(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805C82C0");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -6855,9 +6887,13 @@ L_805C8330:
+     // 0x805C8368: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805C836C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805C836C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805C836C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -7951,9 +7987,13 @@ L_805C88F4:
+     // 0x805C8900: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805C8904(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805C8904(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805C8904");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -8056,9 +8096,13 @@ L_805C8964:
+     // 0x805C8984: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805C8988(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805C8988(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805C8988");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -8203,9 +8247,13 @@ L_805C8A10:
+     // 0x805C8A40: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805C8A44(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805C8A44(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805C8A44");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_147.c b/funcs_147.c
+index b1151cb..599f964 100644
+--- a/funcs_147.c
++++ b/funcs_147.c
+@@ -1,9 +1,13 @@
+ #include "recomp.h"
+ #include "funcs.h"
+ 
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805C8D30(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805C8D30(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805C8D30");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -165,9 +169,13 @@ L_805C8E04:
+     // 0x805C8E1C: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805C8E20(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805C8E20(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805C8E20");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -655,9 +663,13 @@ L_805C9070:
+     // 0x805C907C: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805C9080(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805C9080(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805C9080");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -817,9 +829,13 @@ L_805C9144:
+     // 0x805C9150: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805C9154(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805C9154(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805C9154");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_149.c b/funcs_149.c
+index 37546dc..1edaea8 100644
+--- a/funcs_149.c
++++ b/funcs_149.c
+@@ -837,9 +837,13 @@ RECOMP_FUNC void func_805D3438(uint8_t* rdram, recomp_context* ctx) {
+     // 0x805D3440: sb          $t6, 0x165($a0)
+     MEM_B(0X165, ctx->r4) = ctx->r14;
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_805D3444(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_805D3444(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_805D3444");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_155.c b/funcs_155.c
+index 7164ee3..1482a5e 100644
+--- a/funcs_155.c
++++ b/funcs_155.c
+@@ -1565,9 +1565,13 @@ RECOMP_FUNC void func_80664DF0(uint8_t* rdram, recomp_context* ctx) {
+     // 0x80664E14: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_80664E18(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80664E18(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80664E18");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_156.c b/funcs_156.c
+index 128e4bf..d4f1404 100644
+--- a/funcs_156.c
++++ b/funcs_156.c
+@@ -2613,9 +2613,13 @@ RECOMP_FUNC void func_80666604(uint8_t* rdram, recomp_context* ctx) {
+     // 0x80666648: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_8066664C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8066664C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8066664C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -3284,9 +3288,13 @@ L_8066689C:
+     // 0x80666AC8: addiu       $sp, $sp, 0x108
+     ctx->r29 = ADD32(ctx->r29, 0X108);
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_80666ACC(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80666ACC(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80666ACC");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -3987,9 +3995,13 @@ L_80666E10:
+     // 0x80666E30: addiu       $sp, $sp, 0x48
+     ctx->r29 = ADD32(ctx->r29, 0X48);
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_80666E34(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80666E34(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80666E34");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_16.c b/funcs_16.c
+index d5b5040..74dfe51 100644
+--- a/funcs_16.c
++++ b/funcs_16.c
+@@ -526,9 +526,13 @@ RECOMP_FUNC void func_8002BE88(uint8_t* rdram, recomp_context* ctx) {
+     // 0x8002BEAC: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_8002BEB0(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8002BEB0(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8002BEB0");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_166.c b/funcs_166.c
+index 4f9ef31..14f09ac 100644
+--- a/funcs_166.c
++++ b/funcs_166.c
+@@ -1403,9 +1403,13 @@ L_8069D050:
+     // 0x8069D058: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_8069D05C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8069D05C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8069D05C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_168.c b/funcs_168.c
+index 01bcf25..371447c 100644
+--- a/funcs_168.c
++++ b/funcs_168.c
+@@ -6091,9 +6091,13 @@ RECOMP_FUNC void func_806AEFD4(uint8_t* rdram, recomp_context* ctx) {
+     // 0x806AEFD8: sw          $a0, 0x0($sp)
+     MEM_W(0X0, ctx->r29) = ctx->r4;
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_806AEFDC(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_806AEFDC(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_806AEFDC");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_169.c b/funcs_169.c
+index 4b56fa2..5b31bec 100644
+--- a/funcs_169.c
++++ b/funcs_169.c
+@@ -1,9 +1,13 @@
+ #include "recomp.h"
+ #include "funcs.h"
+ 
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_806AF580(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_806AF580(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_806AF580");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_18.c b/funcs_18.c
+index d069e88..7540b29 100644
+--- a/funcs_18.c
++++ b/funcs_18.c
+@@ -2576,9 +2576,13 @@ RECOMP_FUNC void func_8002F5B4(uint8_t* rdram, recomp_context* ctx) {
+     // 0x8002F5F0: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_8002F5F4(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8002F5F4(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8002F5F4");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -2931,9 +2935,13 @@ L_8002F798:
+     // 0x8002F7A8: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_8002F7AC(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8002F7AC(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8002F7AC");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_181.c b/funcs_181.c
+index 96b5694..7be5540 100644
+--- a/funcs_181.c
++++ b/funcs_181.c
+@@ -3509,9 +3509,13 @@ RECOMP_FUNC void func_806F3450(uint8_t* rdram, recomp_context* ctx) {
+     // 0x806F3494: addiu       $sp, $sp, 0x18
+     ctx->r29 = ADD32(ctx->r29, 0X18);
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_806F3498(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_806F3498(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_806F3498");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_182.c b/funcs_182.c
+index 67bf263..c33f31a 100644
+--- a/funcs_182.c
++++ b/funcs_182.c
+@@ -372,9 +372,13 @@ RECOMP_FUNC void func_806F38EC(uint8_t* rdram, recomp_context* ctx) {
+     // 0x806F3A18: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_806F3A1C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_806F3A1C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_806F3A1C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_187.c b/funcs_187.c
+index 60de964..efa4094 100644
+--- a/funcs_187.c
++++ b/funcs_187.c
+@@ -6797,6 +6797,7 @@ L_80710C10:
+     ctx->r10 = S32(ctx->r9 << (ctx->r8 & 31));
+     // 0x80710C28: or          $t4, $t3, $t2
+     ctx->r12 = ctx->r11 | ctx->r10;
++    workshop_story_world_arm0320(rdram,ctx);
+     // 0x80710C2C: jal         0x8006988C
+     ctx->r31 = ADD32(section_addresses[240], 0x1844); /* workshop: preserve MIPS link before delay slot */
+     // 0x80710C30: sw          $t4, 0xFBC($s1)
+@@ -6807,6 +6808,7 @@ L_80710C10:
+     MEM_W(0XFBC, ctx->r17) = ctx->r12;
+     after_6:
+ L_80710C34:
++    workshop_story_world_commit0320(rdram,ctx);
+     // 0x80710C34: lw          $t5, 0x30($sp)
+     ctx->r13 = MEM_W(ctx->r29, 0X30);
+     // 0x80710C38: sb          $s0, 0x10($t5)
+diff --git a/funcs_19.c b/funcs_19.c
+index 539e838..78d1d46 100644
+--- a/funcs_19.c
++++ b/funcs_19.c
+@@ -3000,9 +3000,13 @@ L_80030B50:
+     // 0x80030B78: addiu       $sp, $sp, 0x38
+     ctx->r29 = ADD32(ctx->r29, 0X38);
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_80030B7C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80030B7C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80030B7C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_191.c b/funcs_191.c
+index 01e9a42..aa12692 100644
+--- a/funcs_191.c
++++ b/funcs_191.c
+@@ -1120,7 +1120,6 @@ L_80739AFC:
+     ctx->r14 = MEM_W(ctx->r4, 0X168);
+     // 0x80739B04: addiu       $v0, $v0, 0x8
+     ctx->r2 = ADD32(ctx->r2, 0X8);
+-    ctx->r5=0;
+     // 0x80739B08: addu        $t0, $t0, $a1
+     ctx->r8 = ADD32(ctx->r8, ctx->r5);
+     // 0x80739B0C: sll         $t0, $t0, 16
+diff --git a/funcs_201.c b/funcs_201.c
+index 14946b8..aa23366 100644
+--- a/funcs_201.c
++++ b/funcs_201.c
+@@ -5223,6 +5223,7 @@ L_80792058:
+     // 0x80792060: addiu       $t3, $v1, 0x1
+     ctx->r11 = ADD32(ctx->r3, 0X1);
+     skip_6:
++    workshop_story_bowser_arm0320(rdram,ctx);
+     // 0x80792064: jal         0x800409F0
+     ctx->r31 = ADD32(section_addresses[271], 0x1D1C); /* workshop: preserve MIPS link before delay slot */
+     // 0x80792068: nop
+@@ -5245,6 +5246,7 @@ L_80792058:
+     // 0x80792078: addiu       $a2, $zero, 0x4C
+     ctx->r6 = ADD32(0, 0X4C);
+     after_8:
++    workshop_story_bowser_commit0320(rdram,ctx);
+     // 0x8079207C: lw          $v1, 0x1E4($s0)
+     ctx->r3 = MEM_W(ctx->r16, 0X1E4);
+     // 0x80792080: addiu       $t3, $v1, 0x1
+diff --git a/funcs_204.c b/funcs_204.c
+index 48f90da..70ba846 100644
+--- a/funcs_204.c
++++ b/funcs_204.c
+@@ -5476,9 +5476,13 @@ L_8079EDAC:
+     // 0x8079EDB4: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void selection_original_func_8079EDB8(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8079EDB8(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8079EDB8");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_206.c b/funcs_206.c
+index f95b5c5..d136785 100644
+--- a/funcs_206.c
++++ b/funcs_206.c
+@@ -2,6 +2,7 @@
+ #include "funcs.h"
+ 
+ RECOMP_FUNC void func_807A6640(uint8_t* rdram, recomp_context* ctx) {
++    if(workshop_special_victory(rdram,ctx))return;
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+     workshop_trace_entry(rdram,ctx,__func__);
+ #endif
+diff --git a/funcs_208.c b/funcs_208.c
+index 0b0b6cd..a09d2f9 100644
+--- a/funcs_208.c
++++ b/funcs_208.c
+@@ -1906,9 +1906,13 @@ RECOMP_FUNC void func_807AEA6C(uint8_t* rdram, recomp_context* ctx) {
+     // 0x807AEA74: sw          $a1, 0x0($v0)
+     MEM_W(0X0, ctx->r2) = ctx->r5;
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void boss_original_func_807AEA78(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_807AEA78(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_807AEA78");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_21.c b/funcs_21.c
+index 5c252c5..68f8524 100644
+--- a/funcs_21.c
++++ b/funcs_21.c
+@@ -259,9 +259,13 @@ L_80032A78:
+     // 0x80032A88: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_80032A8C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80032A8C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80032A8C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_211.c b/funcs_211.c
+index 84c1c77..68dd743 100644
+--- a/funcs_211.c
++++ b/funcs_211.c
+@@ -3213,7 +3213,7 @@ RECOMP_FUNC void func_807BA478(uint8_t* rdram, recomp_context* ctx) {
+     MEM_W(0X138, ctx->r2) = ctx->r15;
+     // 0x807BA4DC: lw          $t9, -0x7250($t9)
+     ctx->r25 = MEM_W(ctx->r25, -0X7250);
+-    { uint32_t color=MEM_W(0,(gpr)(int32_t)0x807F0008); if(color<14)ctx->r25=color; }
++    { uint32_t color=MEM_W(0,(gpr)(int32_t)0x807F0008); if(color<16)ctx->r25=color; }
+     // 0x807BA4E0: lw          $v0, 0x88($t8)
+     ctx->r2 = MEM_W(ctx->r24, 0X88);
+     // 0x807BA4E4: sw          $a0, 0x24($sp)
+diff --git a/funcs_213.c b/funcs_213.c
+index 3f53c87..2c95724 100644
+--- a/funcs_213.c
++++ b/funcs_213.c
+@@ -812,7 +812,7 @@ L_807C37B8:
+     // 0x807C37E4: lw          $t0, 0x168($a0)
+     ctx->r8 = MEM_W(ctx->r4, 0X168);
+     // 0x807C37E8: lw          $t3, 0x4858($t3)
+-    ctx->r11 = MEM_W(ctx->r11, (int16_t)RELOC_LO16(301, 0X14F8));
++    ctx->r11 = MEM_W(0, ADD32(S32(0x807FD2A0u), ctx->r10));
+     // 0x807C37EC: lw          $v0, 0x88($t0)
+     ctx->r2 = MEM_W(ctx->r8, 0X88);
+     // 0x807C37F0: sll         $t4, $t3, 1
+diff --git a/funcs_214.c b/funcs_214.c
+index 4aec52b..045b92e 100644
+--- a/funcs_214.c
++++ b/funcs_214.c
+@@ -1,6 +1,10 @@
+ #include "recomp.h"
+ #include "funcs.h"
+ 
++#ifdef WORKSHOP_SPECIAL_CONTENT
++extern unsigned workshop_coop_filter_available(unsigned);
++#endif
++
+ RECOMP_FUNC void func_807C6C00(uint8_t* rdram, recomp_context* ctx) {
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+     workshop_trace_entry(rdram,ctx,__func__);
+@@ -698,6 +702,7 @@ RECOMP_FUNC void workshop_807F1100(uint8_t* rdram, recomp_context* ctx) {
+     ctx->r10 = ADD32(ctx->r10, 0X1);
+     // 0x807F1124: sw          $t2, 0x1004($t0)
+     MEM_W(0X1004, ctx->r8) = ctx->r10;
++    if(workshop_metal_death(rdram,ctx))goto L_807F1174;
+     // 0x807F1128: addiu       $t2, $t1, -0x8
+     ctx->r10 = ADD32(ctx->r9, -0X8);
+     // 0x807F112C: sltiu       $t3, $t2, 0x6
+@@ -744,12 +749,14 @@ L_807F1154:
+     // 0x807F1170: lw          $t2, 0x1000($t0)
+     ctx->r10 = MEM_W(ctx->r8, 0X1000);
+ L_807F1174:
++    workshop_hard_death0330(rdram,ctx);
+     // 0x807F1174: andi        $t2, $t2, 0x3F
+     ctx->r10 = ctx->r10 & 0X3F;
+     // 0x807F1178: andi        $t4, $t4, 0xFF
+     ctx->r12 = ctx->r12 & 0XFF;
+     // 0x807F117C: or          $t4, $t4, $t2
+     ctx->r12 = ctx->r12 | ctx->r10;
++    workshop_metal_remaining(rdram,ctx);
+     // 0x807F1180: addiu       $a2, $zero, 0x8
+     ctx->r6 = ADD32(0, 0X8);
+     // 0x807F1184: bne         $t4, $zero, L_807F1190
+@@ -907,7 +914,7 @@ RECOMP_FUNC void workshop_807F1800(uint8_t* rdram, recomp_context* ctx) {
+     // 0x807F1824: addiu       $t1, $a1, -0x8
+     ctx->r9 = ADD32(ctx->r5, -0X8);
+     // 0x807F1828: sltiu       $t1, $t1, 0x6
+-    ctx->r9 = ctx->r9 < 0X6 ? 1 : 0;
++    ctx->r9 = ctx->r9 < 0X8 ? 1 : 0;
+     // 0x807F182C: beq         $t1, $zero, L_807F183C
+     if (ctx->r9 == 0) {
+         // 0x807F1830: nop
+@@ -975,7 +982,7 @@ RECOMP_FUNC void workshop_807F1C00(uint8_t* rdram, recomp_context* ctx) {
+     // 0x807F1C10: lui         $t0, 0x8010
+     ctx->r8 = S32(0X8010 << 16);
+     // 0x807F1C14: sltiu       $t1, $v0, 0xE
+-    ctx->r9 = ctx->r2 < 0XE ? 1 : 0;
++    ctx->r9 = ctx->r2 < 0X10 ? 1 : 0;
+     // 0x807F1C18: beq         $t1, $zero, L_807F1CA0
+     if (ctx->r9 == 0) {
+         // 0x807F1C1C: addiu       $t2, $v0, 0x1
+@@ -984,6 +991,7 @@ RECOMP_FUNC void workshop_807F1C00(uint8_t* rdram, recomp_context* ctx) {
+     }
+     // 0x807F1C1C: addiu       $t2, $v0, 0x1
+     ctx->r10 = ADD32(ctx->r2, 0X1);
++    workshop_metal_rescued(rdram,ctx);
+     // 0x807F1C20: sw          $t2, -0x71E0($t0)
+     MEM_W(-0X71E0, ctx->r8) = ctx->r10;
+     // 0x807F1C24: lui         $t3, 0x807F
+@@ -1022,6 +1030,7 @@ L_807F1C48:
+     // 0x807F1C58: sw          $t4, 0x1000($t3)
+     MEM_W(0X1000, ctx->r11) = ctx->r12;
+ L_807F1C5C:
++    workshop_hard_rescue0330(rdram,ctx);
+     // 0x807F1C5C: lw          $t4, -0x720C($t0)
+     ctx->r12 = MEM_W(ctx->r8, -0X720C);
+     // 0x807F1C60: srl         $t1, $t4, 14
+@@ -2618,6 +2627,7 @@ RECOMP_FUNC void workshop_ys_ext_trial_color_unlocked(uint8_t* rdram, recomp_con
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
++    if(workshop_metal_trial_color(rdram,ctx))return;
+     // 0x807F2F18: addiu       $sp, $sp, -0x18
+     ctx->r29 = ADD32(ctx->r29, -0X18);
+     // 0x807F2F1C: sw          $ra, 0x14($sp)
+@@ -4426,6 +4436,7 @@ L_807F39FC:
+     // 0x807F39FC: or          $v0, $v1, $zero
+     ctx->r2 = ctx->r3 | 0;
+ L_807F3A00:
++    workshop_metal_saved_lives(rdram,ctx);
+     // 0x807F3A00: jr          $ra
+     // 0x807F3A04: addiu       $sp, $sp, 0x18
+     ctx->r29 = ADD32(ctx->r29, 0X18);
+@@ -4574,6 +4585,9 @@ L_807F3A94:
+     // 0x807F3AB8: jr          $ra
+     // 0x807F3ABC: or          $v0, $t2, $v1
+     ctx->r2 = ctx->r10 | ctx->r3;
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    ctx->r2 = workshop_coop_filter_available((unsigned)ctx->r2);
++#endif
+     return;
+     // 0x807F3ABC: or          $v0, $t2, $v1
+     ctx->r2 = ctx->r10 | ctx->r3;
+@@ -4619,6 +4633,7 @@ RECOMP_FUNC void workshop_ext_rescue_capacity(uint8_t* rdram, recomp_context* ct
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
++    if(workshop_hard_capacity0330(rdram,ctx))return;
+     // 0x807F3AE0: addiu       $sp, $sp, -0x20
+     ctx->r29 = ADD32(ctx->r29, -0X20);
+     // 0x807F3AE4: sw          $ra, 0x14($sp)
+@@ -4687,8 +4702,9 @@ RECOMP_FUNC void workshop_ext_rescue_picker(uint8_t* rdram, recomp_context* ctx)
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
++    if(workshop_hard_picker0330(rdram,ctx))return;
+     // 0x807F3B38: addiu       $sp, $sp, -0x68
+-    ctx->r29 = ADD32(ctx->r29, -0X68);
++    ctx->r29 = ADD32(ctx->r29, -0X70);
+     // 0x807F3B3C: sw          $ra, 0x14($sp)
+     MEM_W(0X14, ctx->r29) = ctx->r31;
+     // 0x807F3B40: lui         $t6, 0x8010
+@@ -4757,7 +4773,7 @@ L_807F3B84:
+     // 0x807F3B9C: or          $v1, $zero, $zero
+     ctx->r3 = 0 | 0;
+     // 0x807F3BA0: addiu       $a3, $zero, 0x6
+-    ctx->r7 = ADD32(0, 0X6);
++    ctx->r7 = ADD32(0, 0X8);
+     // 0x807F3BA4: addiu       $t4, $zero, 0x1
+     ctx->r12 = ADD32(0, 0X1);
+ L_807F3BA8:
+@@ -4838,7 +4854,7 @@ L_807F3BDC:
+     // 0x807F3C00: addu        $t6, $t0, $t5
+     ctx->r14 = ADD32(ctx->r8, ctx->r13);
+     // 0x807F3C04: sw          $a3, 0x0($t6)
+-    MEM_W(0X0, ctx->r14) = ctx->r7;
++    MEM_W(0X0, ctx->r14) = 6;
+     // 0x807F3C08: addiu       $a1, $a1, 0x1
+     ctx->r5 = ADD32(ctx->r5, 0X1);
+ L_807F3C0C:
+@@ -4877,10 +4893,10 @@ L_807F3C2C:
+     ctx->r1 = ADD32(0, 0X1);
+     // 0x807F3C34: b           L_807F3C80
+     // 0x807F3C38: addiu       $v0, $zero, 0xE
+-    ctx->r2 = ADD32(0, 0XE);
++    ctx->r2 = ADD32(0, 0X10);
+         goto L_807F3C80;
+     // 0x807F3C38: addiu       $v0, $zero, 0xE
+-    ctx->r2 = ADD32(0, 0XE);
++    ctx->r2 = ADD32(0, 0X10);
+ L_807F3C3C:
+     // 0x807F3C3C: bne         $a1, $at, L_807F3C4C
+     if (ctx->r5 != ctx->r1) {
+@@ -4937,7 +4953,7 @@ L_807F3C80:
+     // 0x807F3C80: lw          $ra, 0x14($sp)
+     ctx->r31 = MEM_W(ctx->r29, 0X14);
+     // 0x807F3C84: addiu       $sp, $sp, 0x68
+-    ctx->r29 = ADD32(ctx->r29, 0X68);
++    ctx->r29 = ADD32(ctx->r29, 0X70);
+     // 0x807F3C88: jr          $ra
+     // 0x807F3C8C: nop
+ 
+@@ -5140,6 +5156,7 @@ L_807F3D1C:
+     // 0x807F3D94: sltu        $v0, $zero, $v0
+     ctx->r2 = 0 < ctx->r2 ? 1 : 0;
+ L_807F3D98:
++    workshop_hard_save0330(rdram,ctx);
+     // 0x807F3D98: lw          $ra, 0x14($sp)
+     ctx->r31 = MEM_W(ctx->r29, 0X14);
+     // 0x807F3D9C: addiu       $sp, $sp, 0x20
+@@ -5844,6 +5861,7 @@ RECOMP_FUNC void workshop_ext_story_event(uint8_t* rdram, recomp_context* ctx) {
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
++    if(workshop_story_event0320()){ctx->r2=0;return;}
+     // 0x807F4144: addiu       $sp, $sp, -0x18
+     ctx->r29 = ADD32(ctx->r29, -0X18);
+     // 0x807F4148: sw          $ra, 0x14($sp)
+diff --git a/funcs_25.c b/funcs_25.c
+index d58c86b..f01853a 100644
+--- a/funcs_25.c
++++ b/funcs_25.c
+@@ -1485,9 +1485,13 @@ RECOMP_FUNC void func_80039F00(uint8_t* rdram, recomp_context* ctx) {
+     // 0x80039F44: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_80039F48(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80039F48(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80039F48");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -4549,9 +4553,13 @@ L_8003ADF4:
+     // 0x8003ADFC: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_8003AE00(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8003AE00(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8003AE00");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_26.c b/funcs_26.c
+index b467fac..29b4c6c 100644
+--- a/funcs_26.c
++++ b/funcs_26.c
+@@ -1237,9 +1237,13 @@ RECOMP_FUNC void workshop_8003B8C8(uint8_t* rdram, recomp_context* ctx) {
+     // 0x8003B8EC: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_8003B8F0(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8003B8F0(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8003B8F0");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -3826,9 +3830,13 @@ L_8003C508:
+     // 0x8003C50C: addiu       $sp, $sp, 0x30
+     ctx->r29 = ADD32(ctx->r29, 0X30);
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_8003C510(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8003C510(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8003C510");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_28.c b/funcs_28.c
+index 3b631fa..1aa72e3 100644
+--- a/funcs_28.c
++++ b/funcs_28.c
+@@ -4507,9 +4507,13 @@ L_8003FFC8:
+     // 0x8003FFD4: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_8003FFD8(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8003FFD8(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8003FFD8");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -6564,7 +6568,7 @@ RECOMP_FUNC void func_800409F0(uint8_t* rdram, recomp_context* ctx) {
+     ctx->r3 = 0 | 0;
+     after_0:
+     // 0x80040A10: addiu       $a0, $zero, 0xE
+-    ctx->r4 = ADD32(0, 0XE);
++    ctx->r4 = ADD32(0, 0X10);
+ L_80040A14:
+     // 0x80040A14: andi        $t6, $v0, 0x1
+     ctx->r14 = ctx->r2 & 0X1;
+diff --git a/funcs_30.c b/funcs_30.c
+index e89b307..2c183dc 100644
+--- a/funcs_30.c
++++ b/funcs_30.c
+@@ -720,9 +720,13 @@ RECOMP_FUNC void func_800433D0(uint8_t* rdram, recomp_context* ctx) {
+     // 0x8004344C: addiu       $sp, $sp, 0x20
+     ctx->r29 = ADD32(ctx->r29, 0X20);
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_80043450(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80043450(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80043450");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -855,9 +859,13 @@ L_800434DC:
+     // 0x800434E8: addiu       $sp, $sp, 0x20
+     ctx->r29 = ADD32(ctx->r29, 0X20);
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_800434EC(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_800434EC(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_800434EC");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -1852,9 +1860,13 @@ L_800439BC:
+     // 0x800439F0: or          $v0, $zero, $zero
+     ctx->r2 = 0 | 0;
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_800439F4(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_800439F4(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_800439F4");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -2712,9 +2724,13 @@ L_80043E00:
+     // 0x80043E0C: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_80043E10(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80043E10(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80043E10");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -2809,9 +2825,13 @@ L_80043E78:
+     // 0x80043E84: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_80043E88(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80043E88(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80043E88");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -3291,9 +3311,13 @@ L_800440A0:
+     // 0x800440E0: addiu       $sp, $sp, 0x30
+     ctx->r29 = ADD32(ctx->r29, 0X30);
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_800440E4(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_800440E4(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_800440E4");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -3926,9 +3950,13 @@ L_800443DC:
+     // 0x800443E8: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_800443EC(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_800443EC(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_800443EC");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -4768,9 +4796,13 @@ L_800447B8:
+     // 0x800447C4: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void blargg_original_func_800447C8(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_800447C8(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_800447C8");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_31.c b/funcs_31.c
+index a76d82b..9788c51 100644
+--- a/funcs_31.c
++++ b/funcs_31.c
+@@ -2999,9 +2999,13 @@ L_80045B54:
+     // 0x80045B60: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_80045B64(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80045B64(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80045B64");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -4162,9 +4166,13 @@ L_80046134:
+     // 0x80046138: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_8004613C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8004613C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8004613C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -4558,9 +4566,13 @@ RECOMP_FUNC void func_800462E0(uint8_t* rdram, recomp_context* ctx) {
+     // 0x80046320: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_80046324(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80046324(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80046324");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -5239,9 +5251,13 @@ L_8004666C:
+     // 0x80046678: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_8004667C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8004667C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8004667C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -5536,9 +5552,13 @@ L_800467E8:
+     // 0x80046800: addiu       $sp, $sp, 0x28
+     ctx->r29 = ADD32(ctx->r29, 0X28);
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void flower_original_func_80046804(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80046804(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80046804");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_32.c b/funcs_32.c
+index dcbf2d6..b5d4118 100644
+--- a/funcs_32.c
++++ b/funcs_32.c
+@@ -1407,9 +1407,13 @@ RECOMP_FUNC void func_80046FBC(uint8_t* rdram, recomp_context* ctx) {
+     // 0x80047008: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_8004700C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8004700C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8004700C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -5026,9 +5030,13 @@ L_80048054:
+     // 0x8004805C: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_80048060(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80048060(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80048060");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_33.c b/funcs_33.c
+index 8794d4b..ef9242a 100644
+--- a/funcs_33.c
++++ b/funcs_33.c
+@@ -522,9 +522,13 @@ L_800485B0:
+     // 0x800485B4: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void flower_original_func_800485B8(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_800485B8(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_800485B8");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -1431,9 +1435,13 @@ L_80048A24:
+     // 0x80048A2C: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_80048A30(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80048A30(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80048A30");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -1590,9 +1598,13 @@ L_80048AD4:
+     // 0x80048ADC: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_80048AE0(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80048AE0(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80048AE0");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_37.c b/funcs_37.c
+index bf31a5e..821d6e6 100644
+--- a/funcs_37.c
++++ b/funcs_37.c
+@@ -2807,9 +2807,13 @@ RECOMP_FUNC void func_80050C48(uint8_t* rdram, recomp_context* ctx) {
+     // 0x80050C88: addiu       $sp, $sp, 0x38
+     ctx->r29 = ADD32(ctx->r29, 0X38);
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_80050C8C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80050C8C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80050C8C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -2819,7 +2823,7 @@ RECOMP_FUNC void func_80050C8C(uint8_t* rdram, recomp_context* ctx) {
+     // 0x80050C90: addiu       $t0, $a1, -0x4EF1
+     ctx->r8 = ADD32(ctx->r5, -0X4EF1);
+     // 0x80050C94: sltiu       $t1, $t0, 0x6
+-    ctx->r9 = ctx->r8 < 0X6 ? 1 : 0;
++    ctx->r9 = ctx->r8 < 0X8 ? 1 : 0;
+     // 0x80050C98: beq         $t1, $zero, L_80050CB8
+     if (ctx->r9 == 0) {
+         // 0x80050C9C: sll         $t1, $t0, 1
+diff --git a/funcs_43.c b/funcs_43.c
+index 811738d..e03db04 100644
+--- a/funcs_43.c
++++ b/funcs_43.c
+@@ -4014,9 +4014,13 @@ L_8005D1A4:
+     // 0x8005D1C4: addiu       $sp, $sp, 0x28
+     ctx->r29 = ADD32(ctx->r29, 0X28);
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_8005D1C8(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8005D1C8(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8005D1C8");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -4308,9 +4312,13 @@ L_8005D30C:
+     // 0x8005D31C: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void boss_original_func_8005D320(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8005D320(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8005D320");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_44.c b/funcs_44.c
+index 2d2ceb5..d3f27a8 100644
+--- a/funcs_44.c
++++ b/funcs_44.c
+@@ -2550,9 +2550,13 @@ L_8005E840:
+     // 0x8005E880: addiu       $sp, $sp, 0x28
+     ctx->r29 = ADD32(ctx->r29, 0X28);
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_8005E884(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8005E884(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8005E884");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -5179,9 +5183,13 @@ RECOMP_FUNC void func_8005F690(uint8_t* rdram, recomp_context* ctx) {
+     // 0x8005F6FC: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_8005F700(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8005F700(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8005F700");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_45.c b/funcs_45.c
+index 713e592..da1c03b 100644
+--- a/funcs_45.c
++++ b/funcs_45.c
+@@ -1038,9 +1038,13 @@ L_8006008C:
+     // 0x80060098: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_8006009C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8006009C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8006009C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -1412,9 +1416,13 @@ L_80060260:
+     // 0x80060270: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_80060274(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80060274(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80060274");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -1725,9 +1733,13 @@ L_800603D8:
+     // 0x800603E4: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_800603E8(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_800603E8(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_800603E8");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -2521,9 +2533,13 @@ L_80060788:
+     // 0x80060794: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_80060798(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80060798(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80060798");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -2922,9 +2938,13 @@ L_80060958:
+     // 0x8006095C: addiu       $sp, $sp, 0x18
+     ctx->r29 = ADD32(ctx->r29, 0X18);
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_80060960(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80060960(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80060960");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -4477,9 +4497,13 @@ RECOMP_FUNC void func_8006112C(uint8_t* rdram, recomp_context* ctx) {
+     // 0x8006116C: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_80061170(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_80061170(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_80061170");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_47.c b/funcs_47.c
+index e5b2044..3cbd68f 100644
+--- a/funcs_47.c
++++ b/funcs_47.c
+@@ -6768,9 +6768,13 @@ RECOMP_FUNC void func_800675D0(uint8_t* rdram, recomp_context* ctx) {
+     // 0x800675EC: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_800675F0(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_800675F0(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_800675F0");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_71.c b/funcs_71.c
+index c0a4d3e..62c37f4 100644
+--- a/funcs_71.c
++++ b/funcs_71.c
+@@ -8163,9 +8163,13 @@ L_8042D078:
+     // 0x8042D08C: addiu       $sp, $sp, 0x28
+     ctx->r29 = ADD32(ctx->r29, 0X28);
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_8042D090(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8042D090(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8042D090");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -8678,9 +8682,13 @@ RECOMP_FUNC void func_8042D324(uint8_t* rdram, recomp_context* ctx) {
+     // 0x8042D338: sw          $t6, 0x28($t8)
+     MEM_W(0X28, ctx->r24) = ctx->r14;
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void battle_original_func_8042D33C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8042D33C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8042D33C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_8.c b/funcs_8.c
+index b250ff7..df2bac0 100644
+--- a/funcs_8.c
++++ b/funcs_8.c
+@@ -1432,9 +1432,13 @@ L_8001CC10:
+     // 0x8001CC1C: nop
+ 
+ ;}
++#ifdef WORKSHOP_NATIVE_COOP
++RECOMP_FUNC void flower_original_func_8001CC20(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8001CC20(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8001CC20");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_82.c b/funcs_82.c
+index e8d58ac..0fd7657 100644
+--- a/funcs_82.c
++++ b/funcs_82.c
+@@ -432,6 +432,7 @@ L_80444808:
+     // 0x80444834: sw          $t7, 0xFB4($v1)
+     MEM_W(0XFB4, ctx->r3) = ctx->r15;
+ L_80444838:
++    workshop_hard_init0330(rdram,ctx);
+     // 0x80444838: jr          $ra
+     // 0x8044483C: nop
+ 
+diff --git a/funcs_9.c b/funcs_9.c
+index 87f7851..51aa3bb 100644
+--- a/funcs_9.c
++++ b/funcs_9.c
+@@ -530,9 +530,13 @@ L_8001E084:
+     // 0x8001E090: nop
+ 
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_8001E094(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8001E094(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8001E094");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+@@ -818,9 +822,13 @@ L_8001E1FC:
+     // 0x8001E208: addiu       $sp, $sp, 0x20
+     ctx->r29 = ADD32(ctx->r29, 0X20);
+ ;}
++#if defined(WORKSHOP_NATIVE_COOP)
++RECOMP_FUNC void coop_original_func_8001E20C(uint8_t* rdram, recomp_context* ctx) {
++#else
+ RECOMP_FUNC void func_8001E20C(uint8_t* rdram, recomp_context* ctx) {
++#endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+-    workshop_trace_entry(rdram,ctx,__func__);
++    workshop_trace_entry(rdram,ctx,"func_8001E20C");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+diff --git a/funcs_93.c b/funcs_93.c
+index 5e00d50..82b9788 100644
+--- a/funcs_93.c
++++ b/funcs_93.c
+@@ -5494,6 +5494,7 @@ RECOMP_FUNC void func_80456FA0(uint8_t* rdram, recomp_context* ctx) {
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
++    if(workshop_hard_continue0330(rdram,ctx))return;
+     // 0x80456FA0: addiu       $sp, $sp, -0x20
+     ctx->r29 = ADD32(ctx->r29, -0X20);
+     // 0x80456FA4: sw          $ra, 0x1C($sp)
+@@ -5814,6 +5815,7 @@ L_804570F4:
+     // 0x80457100: sw          $a0, 0x18($sp)
+     MEM_W(0X18, ctx->r29) = ctx->r4;
+     after_2:
++    workshop_hard_new0330(rdram,ctx,1);
+     // 0x80457104: jal         0x80456E84
+     ctx->r31 = ADD32(section_addresses[32], 0x12D2C); /* workshop: preserve MIPS link before delay slot */
+     // 0x80457108: lw          $a0, 0x18($sp)
+@@ -5848,6 +5850,7 @@ L_8045711C:
+     // 0x80457120: sw          $a0, 0x18($sp)
+     MEM_W(0X18, ctx->r29) = ctx->r4;
+     after_5:
++    workshop_hard_new0330(rdram,ctx,0);
+     // 0x80457124: jal         0x80456E04
+     ctx->r31 = ADD32(section_addresses[32], 0x12D4C); /* workshop: preserve MIPS link before delay slot */
+     // 0x80457128: lw          $a0, 0x18($sp)

@@ -22,15 +22,16 @@ public static class EditorVisuals {
 
     public static void Draw(Graphics g,RectangleF box,Placement p){
 
-        if(p.ObjectId is >=0x4F00 and <=0x4F05){
+        if(ObjectCatalog.IsSpecialFruit(p.ObjectId) || ObjectCatalog.IsSpecialBubble(p.ObjectId)){
 
-            string path=Path.Combine(AssetRoot,fruits[p.ObjectId-0x4F00]+"-24x21.png");
+            string path=Path.Combine(AssetRoot,fruits[p.ObjectId-(ObjectCatalog.IsSpecialBubble(p.ObjectId)?0x4F20:0x4F00)]+"-24x21.png");
 
             if(File.Exists(path)){
 
                 if(!images.TryGetValue(path,out var img)){using var source=Image.FromFile(path);images[path]=img=new Bitmap(source);}
 
-                var old=g.InterpolationMode;g.InterpolationMode=InterpolationMode.NearestNeighbor;g.DrawImage(img,box);g.InterpolationMode=old;return;
+                var old=g.InterpolationMode;g.InterpolationMode=InterpolationMode.NearestNeighbor;bool bubbled=ObjectCatalog.IsSpecialBubble(p.ObjectId);var inside=box;if(bubbled)inside.Inflate(-box.Width*.12f,-box.Height*.12f);g.DrawImage(img,inside);g.InterpolationMode=old;
+                if(bubbled){using var ring=new Pen(Color.DeepSkyBlue,Math.Max(1,box.Width/20));g.DrawEllipse(ring,box);g.DrawArc(Pens.White,box.X+box.Width*.12f,box.Y+box.Height*.08f,box.Width*.65f,box.Height*.7f,205,65);}return;
 
             }
 
@@ -40,9 +41,15 @@ public static class EditorVisuals {
 
         using var outline=new Pen(Color.FromArgb(70,64,49),Math.Max(1,w/24));
 
-        if(ObjectCatalog.IsMaskass(p.ObjectId) || ObjectCatalog.IsSpecialMaskass(p.ObjectId)){
+        if(SpecialEditorObjects.IsEgg(p.ObjectId)){
+            int eggColor=SpecialEditorObjects.Color(p.ObjectId);using var spot=new SolidBrush(eggColor==6?Color.LightGray:eggColor==7?Color.FromArgb(40,35,50):Colors[eggColor-8]);
+            g.FillEllipse(Brushes.WhiteSmoke,x+w*.18f,y+h*.1f,w*.64f,h*.82f);g.DrawEllipse(outline,x+w*.18f,y+h*.1f,w*.64f,h*.82f);
+            g.FillEllipse(spot,x+w*.3f,y+h*.2f,w*.2f,h*.23f);g.FillEllipse(spot,x+w*.53f,y+h*.45f,w*.2f,h*.24f);g.FillEllipse(spot,x+w*.27f,y+h*.62f,w*.18f,h*.19f);
+            using var bubble=new Pen(Color.DeepSkyBlue,Math.Max(1,w/25));g.DrawEllipse(bubble,box);return;
+        }
+        if(ObjectCatalog.IsMaskass(p.ObjectId) || ObjectCatalog.IsSpecialMaskass(p.ObjectId) || p.ObjectId is 0x45E3 or 0x45E5 or 0x45B0 or 0x46AA or 0x46AE){
 
-            int c=p.HybridVariant??(ObjectCatalog.IsSpecialMaskass(p.ObjectId)?p.ObjectId-0x4F10:-1);using var body=new SolidBrush(c>=0?Colors[c]:Color.FromArgb(217,77,77));
+            int c=p.HybridVariant??(ObjectCatalog.IsSpecialMaskass(p.ObjectId)?p.ObjectId-0x4F10:-1);using var body=new SolidBrush(p.ObjectId is 0x45E3 or 0x45E5 or 0x45B0?Color.FromArgb(35,35,45):p.ObjectId is 0x46AA or 0x46AE?Color.WhiteSmoke:c>=0?Colors[c]:Color.FromArgb(217,77,77));
 
             g.FillEllipse(body,x+w*.12f,y+h*.2f,w*.76f,h*.7f);g.DrawEllipse(outline,x+w*.12f,y+h*.2f,w*.76f,h*.7f);
 
@@ -50,7 +57,10 @@ public static class EditorVisuals {
 
             g.FillEllipse(Brushes.Black,x+w*.34f,y+h*.27f,w*.08f,h*.16f);g.FillEllipse(Brushes.Black,x+w*.58f,y+h*.27f,w*.08f,h*.16f);g.FillEllipse(Brushes.Black,x+w*.45f,y+h*.5f,w*.1f,h*.12f);
 
-            g.FillEllipse(Brushes.SlateBlue,x+w*.1f,y+h*.78f,w*.35f,h*.17f);g.FillEllipse(Brushes.SlateBlue,x+w*.55f,y+h*.78f,w*.35f,h*.17f);return;
+            g.FillEllipse(Brushes.SlateBlue,x+w*.1f,y+h*.78f,w*.35f,h*.17f);g.FillEllipse(Brushes.SlateBlue,x+w*.55f,y+h*.78f,w*.35f,h*.17f);
+            if(p.ObjectId is 0x45E3 or 0x45E5 or 0x45B0){g.DrawLine(outline,x+w*.25f,y+h*.06f,x+w*.75f,y+h*.06f);g.DrawLine(outline,x+w*.5f,y,x+w*.5f,y+h*.15f);}
+            if(p.ObjectId==0x45E5){g.FillRectangle(Brushes.Gray,x+w*.7f,y+h*.6f,w*.3f,h*.3f);g.DrawLine(outline,x+w*.75f,y+h*.55f,x+w*.8f,y+h*.65f);g.DrawLine(outline,x+w*.95f,y+h*.55f,x+w*.9f,y+h*.65f);}
+            if(p.ObjectId==0x45B0){g.FillEllipse(Brushes.Black,x+w*.7f,y+h*.6f,w*.3f,h*.3f);g.DrawLine(Pens.OrangeRed,x+w*.85f,y+h*.6f,x+w*.95f,y+h*.5f);}return;
 
         }
 
@@ -92,11 +102,11 @@ public sealed partial class LevelCanvas:Control {
 
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
 
-    public LevelProject? Level {get=>level;set{level=value;selected=null;Invalidate();}}
+    public LevelProject? Level {get=>level;set{CancelObjectGesture();CancelTerrainGesture();ClearTerrainSectionSelection();level=value;selectionItems.Clear();selected=null;Invalidate();}}
 
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
 
-    public Placement? Selected {get=>selected;set{selected=value;Invalidate();}}
+    public Placement? Selected {get=>selected;set=>SetObjectSelection(value==null?[]:[value],value,false);}
 
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
 
@@ -112,9 +122,9 @@ public sealed partial class LevelCanvas:Control {
 
     public event Action? SelectionChanged,BeforeEdit,Edited,ViewChanged;
 
-    float zoom=.2f,panX=40,panY=40,grabX,grabY;
+    float zoom=.2f,panX=40,panY=40;
 
-    bool dragging,panning,changed;Point last;
+    bool panning;Point last;
 
     public PointF WorldCenter=>new((Width/2f-panX)/zoom,(Height/2f-panY)/zoom);
 
@@ -131,7 +141,7 @@ public sealed partial class LevelCanvas:Control {
 
     public void CenterOn(Placement p){panX=Width/2f-p.X*zoom;panY=Height/2f-p.Y*zoom;Invalidate();}
 
-    public void Nudge(int dx,int dy){if(Selected==null || (Selected.ObjectId>=0x8000 || Selected.ObjectId==0x4001))return;BeforeEdit?.Invoke();Selected.X=Math.Clamp(Selected.X+dx,-100000,100000);Selected.Y=Math.Clamp(Selected.Y+dy,-100000,100000);Edited?.Invoke();Invalidate();}
+    public void Nudge(int dx,int dy)=>MoveObjectSelection(dx,dy);
 
     protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);Draw(e.Graphics,Width,Height);}
 
@@ -143,21 +153,21 @@ public sealed partial class LevelCanvas:Control {
 
         if(level==null){using var title=new Font("Segoe UI",18,FontStyle.Bold);g.DrawString("Choisis un original, puis crée ta copie.",title,Brushes.DarkSlateGray,28,40);g.DrawString("Le décor et les collisions sont conservés.\nAjoute ensuite tes fruits, ennemis et objets.",Font,Brushes.DarkSlateGray,28,88);return;}
 
-        foreach(var p in VisibleObjects){float x=panX+p.X*zoom,y=panY+p.Y*zoom;if(x< -40 || y< -40 || x>width+40 || y>height+40)continue;float size=p.ObjectId>=0x8000?12:Math.Clamp(28*zoom,17,40);var box=new RectangleF(x-size/2,y-size/2,size,size);EditorVisuals.Draw(g,box,p);
+        foreach(var p in VisibleObjects){var at=ObjectDisplayPosition(p);float x=panX+at.X*zoom,y=panY+at.Y*zoom;if(x< -40 || y< -40 || x>width+40 || y>height+40)continue;float size=p.ObjectId>=0x8000?12:Math.Clamp(28*zoom,17,40);var box=new RectangleF(x-size/2,y-size/2,size,size);EditorVisuals.Draw(g,box,p);
 
-            if(p==Selected){using var selectedPen=new Pen(Color.FromArgb(35,121,116),2);g.DrawRectangle(selectedPen,box.X-5,box.Y-5,box.Width+10,box.Height+10);string name=ObjectCatalog.Get(ObjectCatalog.PaletteId(p)).Name;SizeF label=g.MeasureString(name,Font);var area=new RectangleF(x+size/2+9,y-13,label.Width+12,26);g.FillRectangle(Brushes.Ivory,area);g.DrawString(name,Font,Brushes.DarkSlateGray,area.X+6,area.Y+4);}
+            if(selectionItems.Contains(p)){using var selectedPen=new Pen(Color.FromArgb(35,121,116),2);g.DrawRectangle(selectedPen,box.X-5,box.Y-5,box.Width+10,box.Height+10);if(p!=Selected || selectionItems.Count>1)continue;string name=ObjectCatalog.Get(ObjectCatalog.PaletteId(p)).Name;SizeF label=g.MeasureString(name,Font);var area=new RectangleF(x+size/2+9,y-13,label.Width+12,26);g.FillRectangle(Brushes.Ivory,area);g.DrawString(name,Font,Brushes.DarkSlateGray,area.X+6,area.Y+4);}
 
         }
 
-        using var textBack=new SolidBrush(Color.FromArgb(230,255,253,242));g.FillRectangle(textBack,0,height-31,width,31);g.DrawString($"{SceneCaption??("Source "+VanillaRom.SourceCode(level.SourceZone))}  ·  {level.Objects.Count} objets  ·  {ZoomText}  ·  Bas = Y positif",Font,Brushes.DarkSlateGray,12,height-24);
+        DrawObjectSelectionOverlay(g);
+        DrawTerrainPointer(g);
+        using var textBack=new SolidBrush(Color.FromArgb(230,255,253,242));g.FillRectangle(textBack,0,height-31,width,31);g.DrawString($"{SceneCaption??("Source "+VanillaRom.SourceCode(level.SourceZone))}  ·  {level.Objects.Count} objets  ·  {selectionItems.Count} sélectionné(s)  ·  {ZoomText}  ·  Bas = Y positif",Font,Brushes.DarkSlateGray,12,height-24);
 
     }
 
-    protected override void OnMouseDown(MouseEventArgs e){base.OnMouseDown(e);Focus();last=e.Location;changed=false;if(e.Button==MouseButtons.Right){panning=true;Capture=true;return;}if(e.Button!=MouseButtons.Left)return;Selected=VisibleObjects.Where(p=>Math.Abs(panX+p.X*zoom-e.X)<15 && Math.Abs(panY+p.Y*zoom-e.Y)<15).OrderBy(p=>Math.Abs(panX+p.X*zoom-e.X)+Math.Abs(panY+p.Y*zoom-e.Y)).FirstOrDefault();dragging=Selected!=null && Selected.ObjectId<0x8000 && Selected.ObjectId!=0x4001;if(Selected!=null){grabX=Selected.X-(e.X-panX)/zoom;grabY=Selected.Y-(e.Y-panY)/zoom;}Capture=dragging;SelectionChanged?.Invoke();Invalidate();}
-
-    protected override void OnMouseMove(MouseEventArgs e){base.OnMouseMove(e);if(panning){panX+=e.X-last.X;panY+=e.Y-last.Y;last=e.Location;Invalidate();ViewChanged?.Invoke();}else if(dragging && Selected!=null){if(!changed){BeforeEdit?.Invoke();changed=true;}float sx=(e.X-panX)/zoom+grabX,sy=(e.Y-panY)/zoom+grabY;if(SnapSize>0 && !ModifierKeys.HasFlag(Keys.Alt)){sx=MathF.Round(sx/SnapSize)*SnapSize;sy=MathF.Round(sy/SnapSize)*SnapSize;}Selected.X=Math.Clamp(sx,-100000,100000);Selected.Y=Math.Clamp(sy,-100000,100000);Invalidate();}}
-
-    protected override void OnMouseUp(MouseEventArgs e){base.OnMouseUp(e);if(changed)Edited?.Invoke();dragging=panning=false;Capture=false;}
+    protected override void OnMouseDown(MouseEventArgs e){base.OnMouseDown(e);Focus();last=e.Location;CancelObjectGesture();if(BeginTerrain(e))return;if(e.Button==MouseButtons.Right){panning=true;Capture=true;return;}if(e.Button==MouseButtons.Left)BeginObjectGesture(e.Location);}
+    protected override void OnMouseMove(MouseEventArgs e){base.OnMouseMove(e);if(MoveTerrain(e))return;if(panning){panX+=e.X-last.X;panY+=e.Y-last.Y;last=e.Location;Invalidate();ViewChanged?.Invoke();}else MoveObjectGesture(e.Location);}
+    protected override void OnMouseUp(MouseEventArgs e){base.OnMouseUp(e);if(EndTerrain(e))return;if(e.Button==MouseButtons.Left)EndObjectGesture(e.Location);if(panning){panning=false;Capture=false;}}
 
     protected override void OnMouseWheel(MouseEventArgs e){base.OnMouseWheel(e);float wx=(e.X-panX)/zoom,wy=(e.Y-panY)/zoom;zoom=Math.Clamp(zoom*(e.Delta>0?1.2f:1/1.2f),.025f,4);panX=e.X-wx*zoom;panY=e.Y-wy*zoom;Invalidate();ViewChanged?.Invoke();}
 

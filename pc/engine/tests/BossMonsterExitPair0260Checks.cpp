@@ -1,0 +1,20 @@
+#include "../boss_battle_runtime0250.hpp"
+#define main legacy_left_support_checks
+#include "BossMonsterExit0260Checks.cpp"
+#undef main
+namespace runtime=workshop::boss_campaign0250;
+int main(int argc,char** argv){try{
+ need(argc==3,"Supply immutable actual old-left and final469 native snapshots");char* legacy[]={argv[0],argv[1]};if(legacy_left_support_checks(2,legacy))return 1;
+ std::ifstream file(argv[2],std::ios::binary);std::vector<uint8_t> captured((std::istreambuf_iterator<char>(file)),{});need(captured.size()==0x800000,"Actual final469 snapshot8MiB");Fixture f(captured);constexpr uint32_t right=0x800C954C;const auto native_before=f.memory;
+ need(n::actor(f.rdram,right,0x415E)&&n::word(f.rdram,right+0x1DC)==0x415E0000,"Real new snapshot has typed415E source");const auto source=n::word(f.rdram,right+0x1D8),resource=n::word(f.rdram,right+0x168),metadata=n::word(f.rdram,right+0x174),definition=n::word(f.rdram,metadata),factory=n::word(f.rdram,resource+0x40);
+ need(n::word(f.rdram,source+4)==std::bit_cast<uint32_t>(472.f)&&n::word(f.rdram,source+8)==std::bit_cast<uint32_t>(376.f),"Actual right-source coordinates472/376");need(n::word(f.rdram,right+0x20)==factory+0xC00&&n::word(f.rdram,definition+0x64)==0x800615D0&&n::word(f.rdram,definition+0x68)==0x800611C0,"Actual right source retains same native callback/profile");need(!f.read(),"Actual final parent0 cannot manufacture the earlier logged rider witness");need(f.memory==native_before,"Actual source readers preserve all8MiB");
+ // Explicit HOST graph frontier from the live log's repeatedly observed
+ // P1 parent800C954C. The final snapshot itself is already detached, so this
+ // fixture does not claim it captured a native attachment or successful fall.
+ f.w(f.player+0x180,right);f.w(f.metadata+4,right);f.h(f.player+0x17E,0);f.by(f.priv+0xF4,0);for(unsigned i=0;i<20;++i)f.w(right+0x188+4*i,0);f.w(right+0x188,f.player);f.h(right+0x184,1);
+ const auto graph=f.memory;auto first=f.read();need(first&&first->support_attested&&first->support.actor==right&&first->stage==q::Stage::Descend&&first->target_x==428&&first->pot_x==472&&first->pot_y==469,"HOST logged-right-rider frontier attests real safe428 column below actual source472");need(f.memory==graph,"Right reader leaves HOST graph snapshot unchanged");
+ need(runtime::configure("MonsterRightExit",1,true,true,3),"HOST Runtime selects real Monsters encounter");runtime::rooms::configure(runtime::session.plan());runtime::enter_room(52);need(runtime::session.enter_fight(151,f.player),"HOST Runtime retains actual same player");auto& state=const_cast<workshop::boss_battle0250::Snapshot&>(runtime::session.snapshot());state.phase=workshop::boss_battle0250::Phase::Victory;runtime::exit_pot=f.pot;runtime::exit_x=472;uint16_t buttons=0;float x=0,y=0;need(runtime::drive_monster_exit_input(f.rdram,f.player,40000,&buttons,&x,&y)&&x<0&&!y&&!buttons&&runtime::monster_exit_support,"Actual Runtime consumer walks off right support without periodic A");need(f.memory==graph,"Shared consumer also preserves HOST8MiB");
+ f.w(f.player+0x180,0);f.w(f.metadata+4,0);f.by(f.priv+0xF4,1);f.fl(f.player+0x84,428);need(runtime::drive_monster_exit_input(f.rdram,f.player,40001,&buttons,&x,&y)&&!x&&!y&&!buttons,"Above support at escape428 actual consumer waits for native gravity");f.fl(f.player+0x88,465);need(runtime::drive_monster_exit_input(f.rdram,f.player,40002,&buttons,&x,&y)&&x>0&&!y&&!buttons,"Only below current right elevator switches toward actual pot472, A stays released");
+ for(unsigned bad=0;bad<4;++bad){Fixture wrong(graph);if(bad==0)wrong.h(right+12,0x415F);if(bad==1)wrong.fl(source+4,312);if(bad==2)wrong.w(right+0x1DC,0x415F0000);if(bad==3)wrong.fl(right+0x84,312);need(!wrong.read(),"Crossed kind/sourceX/packed/currentX pairs refuse native route");}
+ std::cout<<"BossMonsterExitPair0260Checks: "<<checks<<" PASS combined; old actual415F preserved, new actual415E profile unchanged, logged attachment is explicit HOST frontier. No native fall/pot/transport success claim.\n";return 0;
+}catch(const std::exception& ex){std::cerr<<"FAIL: "<<ex.what()<<'\n';return 1;}}

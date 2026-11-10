@@ -1,0 +1,9 @@
+#include "../menu_music_session0310.hpp"
+#include <filesystem>
+#include <iostream>
+#include <stdexcept>
+namespace mm=workshop::menu_music_session0310;
+namespace pcm=workshop::menu_music_host0310;
+int main(int argc,char** argv){unsigned checks=0;auto need=[&](bool v,const char* why){++checks;if(!v)throw std::runtime_error(why);};try{
+ need(argc==5,"Expected absolute worker directory, internal ROM, fresh cache and source renderer identity");const std::filesystem::path cache=argv[3];need(!std::filesystem::exists(cache),"Preserve existing cache");const mm::Config config{argv[1],cache,argv[2]};auto first=mm::detail::render_job(config,{});need(first.clip&&!first.from_cache&&first.reason=="render-ready","First real POSIX render job failed");need(first.renderer_sha256==argv[4]&&first.rom_sha256=="e8a63388c38f8f0bea37e9b13a97f0898ac5496e08ca2028afb8db9a866e0ce9","Real job provenance mismatch");need(first.clip->sample_rate==32000&&first.clip->loop_begin==3997648&&first.clip->loop_end==4931696&&first.clip->samples.size()==2*4931696,"Real measured PCM changed at Session import");auto second=mm::detail::render_job(config,{});need(second.clip&&second.from_cache&&second.reason=="cache-ready","Second real POSIX job did not use cache");need(second.clip->samples==first.clip->samples&&second.clip->loop_begin==first.clip->loop_begin&&second.clip->loop_end==first.clip->loop_end,"Cached real PCM not byte exact");unsigned files=0;for(const auto& item:std::filesystem::directory_iterator(cache))if(item.is_regular_file())++files;need(files==1,"Real cache publication duplicated/clobbered files");std::cout<<"{\"passed\":true,\"checks\":"<<checks<<",\"realPosixWorkerJobs\":2,\"firstRendered\":true,\"secondFromCache\":true,\"frames\":4931696,\"unicodeCache\":true,\"PCMImportedIntact\":true,\"game\":false,\"gpu\":false}"<<std::endl;return 0;
+ }catch(const std::exception& e){std::cerr<<"FAIL realMusicJob0340: "<<e.what()<<std::endl;return 1;}}

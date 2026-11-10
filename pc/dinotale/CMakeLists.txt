@@ -463,12 +463,25 @@ target_sources(DinoTale PRIVATE ${GENERATED_NRM_SOURCES})
 # RSP audio microcode: rsp/aspMain.cpp is generated from the ROM by RSPRecomp
 # (aspMain.us.toml), so it's gitignored and only built when the ROM is present.
 set(DT_ROM_PATH "${CMAKE_SOURCE_DIR}/yoshisstory.us.z64")
+set(DT_RSP_CONFIG "${CMAKE_SOURCE_DIR}/aspMain.us.toml")
+# The distributed BPS leaves the audio microcode unchanged. Regenerate audio
+# directly from the already-prepared local content instead of copying an
+# original game image into this source tree.
+if (WORKSHOP_CONTENT_ROM AND EXISTS "${WORKSHOP_CONTENT_ROM}")
+    set(DT_ROM_PATH "${WORKSHOP_CONTENT_ROM}")
+    file(TO_CMAKE_PATH "${DT_ROM_PATH}" DT_RSP_ROM_PATH)
+    file(READ "${CMAKE_SOURCE_DIR}/aspMain.us.toml" DT_RSP_CONFIG_TEXT)
+    string(REPLACE "rom_file_path = \"yoshisstory.us.z64\""
+        "rom_file_path = \"${DT_RSP_ROM_PATH}\"" DT_RSP_CONFIG_TEXT "${DT_RSP_CONFIG_TEXT}")
+    set(DT_RSP_CONFIG "${CMAKE_CURRENT_BINARY_DIR}/aspMain.content0340.toml")
+    file(WRITE "${DT_RSP_CONFIG}" "${DT_RSP_CONFIG_TEXT}")
+endif()
 if (EXISTS "${DT_ROM_PATH}")
     add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/rsp/aspMain.cpp
         COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/rsp
-        COMMAND $<TARGET_FILE:RSPRecomp> aspMain.us.toml
+        COMMAND $<TARGET_FILE:RSPRecomp> "${DT_RSP_CONFIG}"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        DEPENDS ${CMAKE_SOURCE_DIR}/aspMain.us.toml RSPRecomp
+        DEPENDS "${DT_RSP_CONFIG}" "${DT_ROM_PATH}" RSPRecomp
     )
     target_sources(DinoTale PRIVATE ${CMAKE_SOURCE_DIR}/rsp/aspMain.cpp)
     target_compile_definitions(DinoTale PRIVATE DT_HAS_RSP_AUDIO)

@@ -107,3 +107,30 @@ text = "workshop_find_reset();"
 func = "workshop_807F1800"
 before_vram = 0x807F1800
 text = "workshop_find_reset();"
+
+# Solo Gold/Silver use PC slots14/15 and safe native White/Black aliases.
+# The historical six-byte progression codec remains unchanged.
+[[patches.hook]]
+func = "workshop_ys_ext_trial_color_unlocked"
+before_vram = 0x807F2F18
+text = "if(workshop_metal_trial_color(rdram,ctx))return;"
+
+[[patches.hook]]
+func = "workshop_ext_saved_lives"
+before_vram = 0x807F3A00
+text = "workshop_metal_saved_lives(rdram,ctx);"
+
+[[patches.hook]]
+func = "workshop_807F1100"
+before_vram = 0x807F1128
+text = "if(workshop_metal_death(rdram,ctx))goto L_807F1174;"
+
+[[patches.hook]]
+func = "workshop_807F1100"
+before_vram = 0x807F1180
+text = "workshop_metal_remaining(rdram,ctx);"
+
+[[patches.hook]]
+func = "workshop_807F1C00"
+before_vram = 0x807F1C20
+text = "workshop_metal_rescued(rdram,ctx);"

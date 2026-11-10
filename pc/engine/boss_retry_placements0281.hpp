@@ -1,0 +1,129 @@
+#pragma once
+#include "boss_native.hpp"
+#include "boss_rooms_data0250.hpp"
+#include <array>
+
+namespace workshop::boss_retry_placements0281 {
+namespace n=boss_native;namespace core=boss_battle0250;namespace rooms=boss_rooms_data0250;
+// 41C6, campaign4511 and opt-in41EC retire through447C8, without48CC0 restoring
+// their consumed placements. A Fish companion4072/4599 intentionally loses
+// its respawn link after a proven defeat (boss_placement0260). Cached6DA0C
+// skips6D85C, so replay rearms only these captured original boss words.
+// Ordinary Genie/Invisible/Lips/Candy arenas remain outside this guard.
+// No actor, HP, score, pose, resource or constructor is created here.
+inline constexpr uint16_t kind=0x41C6;
+inline bool capture_kind(const core::Encounter& e,uint16_t k){
+ if(e.family==core::Family::Blargg)return k==0x41EC;
+ return e.family==core::Family::Monsters?k==kind:e.family==core::Family::Fish&&(k==0x4511||k==0x4072||k==0x4599);
+}
+struct Cache {
+ uint32_t registry_table=0,entry=0,wrapper=0,header=0,table=0;unsigned count=0;
+ bool operator==(const Cache&)const=default;
+};
+struct Placement {uint32_t record=0,packed=0,x=0,y=0;};
+struct Room {
+ bool captured=false;unsigned source=177,index=10,pending_epoch=0,restored_epoch=0;
+ Cache cache{};unsigned count=0;std::array<Placement,4> placements{};
+};
+struct Fence {unsigned room=177,index=10,epoch=0,vi=0;core::Phase phase=core::Phase::Idle;};
+struct Receipt {unsigned room=177,index=10,epoch=0,vi=0,count=0;uint32_t cache=0,table=0;};
+inline bool aligned(uint32_t a,size_t size){return !(a&3)&&n::range(a,size);}
+// Mirrors6D6F8/57A28/6D6E4, with bounded pointer validation before a call
+// to the actual native getter. The11-slot registry is not actor teardown.
+inline bool lookup(uint8_t* r,unsigned source,Cache& out){
+ auto* rdram=r;
+ if(!r||source>=177||MEM_HU(8,n::base(0x800F8440))!=11)return false;
+ const auto table=n::word(r,0x800F8450);if(!aligned(table,44))return false;
+ unsigned found=0;Cache value{};
+ for(unsigned i=0;i<11;++i){const auto entry=n::word(r,table+i*4);if(!entry)continue;if(!aligned(entry,0xA94))return false;
+  if(n::byte(r,entry+1)!=source)continue;if(++found!=1)return false;
+  const auto wrapper=n::word(r,entry+0x60);if(!aligned(wrapper,4))return false;
+  const auto header=n::word(r,wrapper);if(!aligned(header,8))return false;
+  const auto count=MEM_HU(0,n::base(header));const auto objects=n::word(r,header+4);
+  if(!count||count>149||!aligned(objects,0x960))return false;
+  value={table,entry,wrapper,header,objects,count};
+ }
+ if(found!=1)return false;out=value;return true;
+}
+inline bool owned(const rooms::Arena& a,const core::Encounter& e,unsigned index){
+ if(index<1||index>8||a.source!=167+index||a.native_init!=0x01000000||e.number!=index+1||!e.count||e.count>4||a.boss_indices.size()!=e.count||a.objects.empty()||a.objects.size()%12||a.objects.size()/12>149)return false;
+ if(e.family==core::Family::Monsters){if(a.logical_source!=151||e.count!=2)return false;}
+ else if(e.family==core::Family::Fish){if(a.logical_source!=97||!core::valid_fish(e))return false;}
+ else if(e.family==core::Family::Blargg){
+  if(a.logical_source!=19||e.variant!=0||e.terrain>2||e.count!=2||e.genie_companion||e.purple_mask||!e.no_flowers||!e.no_egg_blocks)return false;
+  for(unsigned m=0;m<e.count;++m){const auto& b=e.members[m];if(b.kind!=0x41EC||b.hits!=3||b.scale!=1.f||b.red||b.purple||b.green)return false;}
+ }
+ else return false;
+ for(unsigned m=0;m<e.count;++m){const auto at=size_t(a.boss_indices[m])*12;const auto k=e.members[m].kind;
+  if(!capture_kind(e,k)||at+12>a.objects.size()||u32(a.objects,at)!=(uint32_t(k)<<16|m))return false;
+  for(unsigned other=0;other<m;++other)if(a.boss_indices[other]==a.boss_indices[m])return false;
+ }
+ return true;
+}
+inline bool native_table(uint8_t* r,const Cache& cache,const rooms::Arena& a){
+ if(cache.count!=a.objects.size()/12||!aligned(cache.table,0x960))return false;
+ for(size_t p=0;p<a.objects.size();p+=12){const auto at=cache.table+uint32_t(p/12)*16,packed=n::word(r,at);
+  if((packed!=0xFFFFFFFF&&packed!=u32(a.objects,p))||n::word(r,at+4)!=u32(a.objects,p+4)||n::word(r,at+8)!=u32(a.objects,p+8))return false;
+ }return true;
+}
+inline bool retired_links(uint8_t* r,const Room& room){
+ // Include pending/parented actors outside the main manager too. Native44658
+ // writes17D=3 and stateFF at447A8..447B0; a retained live link is rejected.
+ for(uint32_t a=0x80000400;a<=0x80800000-0x1FC;a+=4){
+  if(n::word(r,a)!=0x19971110||n::byte(r,a+6)==3||n::byte(r,a+0x17D)==3)continue;
+  const auto record=n::word(r,a+0x1D8);for(unsigned m=0;m<room.count;++m)if(record==room.placements[m].record)return false;
+ }return true;
+}
+class Guard {
+ std::array<Room,10> rooms_{};unsigned epoch_=0;const char* failure_="none";
+ bool reject(const char* why){failure_=why;return false;}
+public:
+ void reset(){rooms_={};epoch_=0;failure_="none";}
+ const auto& snapshot()const{return rooms_;}const char* failure()const{return failure_;}
+ bool pending(unsigned index)const{return index<10&&rooms_[index].pending_epoch!=0;}
+ bool capture(uint8_t* r,const recomp_context* c,const rooms::Arena& a,const core::Encounter& e,unsigned index,unsigned epoch){
+  if(!r||!c||epoch!=epoch_||!owned(a,e,index)||uint32_t(c->r31)!=0x8005A050)return reject("capture_scope");
+  const auto actor=uint32_t(c->r4),record=uint32_t(c->r5);
+  if(!aligned(record,16)||!capture_kind(e,uint16_t(n::word(r,record)>>16))||!n::actor(r,actor,uint16_t(n::word(r,record)>>16))||!aligned(n::word(r,actor+0x168),0x50))return reject("capture_actor");
+  Cache cache;if(!lookup(r,a.source,cache)||!native_table(r,cache,a))return reject("capture_cache");
+  bool matched=false;for(unsigned m=0;m<e.count;++m){const auto offset=size_t(a.boss_indices[m])*12;
+   if(record==cache.table+uint32_t(a.boss_indices[m])*16&&n::word(r,record)==u32(a.objects,offset))matched=true;
+  }
+  // Native45CAC/45D54..6C replaces bits2..7 of actor byteE with
+  // resource[2]<<2 for every supported4xxx kind, before48E9C. The ROM
+  // record stays pristine. Keep its kind and all10 low role bits exact.
+  const auto packed=n::word(r,record),resource=n::word(r,actor+0x168);
+  const auto actor_packed=(packed&0xFFFF03FFu)|((uint32_t(n::byte(r,resource+2))<<10)&0xFC00u);
+  if(!matched||n::word(r,actor+12)!=actor_packed)return reject("capture_placement");
+  auto& saved=rooms_[index];if(saved.pending_epoch)return reject("capture_before_replay_restore");
+  if(saved.captured&&saved.cache!=cache)return reject("capture_cache_changed");
+  saved.captured=true;saved.source=a.source;saved.index=index;saved.cache=cache;saved.count=e.count;
+  for(unsigned m=0;m<e.count;++m){const auto p=size_t(a.boss_indices[m])*12;saved.placements[m]={cache.table+uint32_t(a.boss_indices[m])*16,u32(a.objects,p),u32(a.objects,p+4),u32(a.objects,p+8)};}
+  return true;
+ }
+ // Called only after Session::retry_checkpoint succeeds; the prior index is
+ // captured before that transition. No guest write occurs at death/cleanup.
+ bool arm(unsigned epoch,unsigned checkpoint,unsigned prior_index){
+  if(epoch_==UINT32_MAX||epoch!=epoch_+1||prior_index>=10||checkpoint>prior_index||!boss_checkpoint0260::valid(checkpoint))return reject("retry_epoch");
+  epoch_=epoch;for(unsigned i=0;i<10;++i)rooms_[i].pending_epoch=rooms_[i].captured&&i>=checkpoint&&i<=prior_index?epoch:0;return true;
+ }
+ template<class Dispatch> bool restore(uint8_t* r,const recomp_context* c,const rooms::Arena& a,const core::Encounter& e,const Fence& f,Receipt& receipt,Dispatch&& dispatch){
+  receipt={};if(!pending(f.index))return true;auto& saved=rooms_[f.index];
+  if(!r||!c||!owned(a,e,f.index)||f.epoch!=epoch_||saved.pending_epoch!=f.epoch||saved.source!=f.room||a.source!=f.room||saved.count!=e.count||!f.vi||
+     (f.phase!=core::Phase::ToFight&&f.phase!=core::Phase::RetryToFight)||uint32_t(c->r31)!=0x8006DDFC||(uint32_t(c->r5)&255)!=f.room||!aligned(uint32_t(c->r4),0x128))return reject("restore_fence");
+  const auto stack=uint32_t(c->r29);if(stack<0x80000800||!aligned(stack-0x200,0x220))return reject("restore_stack");
+  Cache cache;if(!lookup(r,f.room,cache)||cache!=saved.cache||!native_table(r,cache,a)||!retired_links(r,saved))return reject("restore_cache_or_live_actor");
+  recomp_context work=*c;work.r29=n::base(stack-0x100);work.r4=f.room;dispatch(0x8006D6F8,r,&work);
+  if(uint32_t(work.r2)!=cache.entry)return reject("native_cache_getter");
+  // Global preflight again after the native read, before the first setter.
+  Cache again;if(!lookup(r,f.room,again)||again!=cache||!native_table(r,cache,a)||!retired_links(r,saved))return reject("restore_preflight");
+  for(unsigned m=0;m<e.count;++m){const auto& p=saved.placements[m];const auto at=size_t(a.boss_indices[m])*12;
+   if(p.record!=cache.table+uint32_t(a.boss_indices[m])*16||p.packed!=u32(a.objects,at)||p.x!=u32(a.objects,at+4)||p.y!=u32(a.objects,at+8))return reject("restore_pristine_identity");
+  }
+  unsigned count=0;for(unsigned m=0;m<saved.count;++m){const auto& p=saved.placements[m];if(n::word(r,p.record)==0xFFFFFFFF){work=*c;work.r29=n::base(stack-0x100);work.r4=n::base(p.record);work.r5=n::base(p.packed);dispatch(0x8006D34C,r,&work);++count;}}
+  for(unsigned m=0;m<saved.count;++m){const auto& p=saved.placements[m];if(n::word(r,p.record)!=p.packed||n::word(r,p.record+4)!=p.x||n::word(r,p.record+8)!=p.y)return reject("native_placement_readback");}
+  if(!native_table(r,cache,a))return reject("native_table_readback");
+  saved.pending_epoch=0;saved.restored_epoch=f.epoch;receipt={f.room,f.index,f.epoch,f.vi,count,cache.entry,cache.table};return true;
+ }
+};
+} // namespace workshop::boss_retry_placements0281

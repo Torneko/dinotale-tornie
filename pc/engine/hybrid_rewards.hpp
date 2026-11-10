@@ -1,6 +1,7 @@
 #pragma once
 #include "fruit_mix.hpp"
 #include "special_content_rules.hpp"
+#include "metal_rewards0300.hpp"
 #include <optional>
 
 namespace workshop::rewards {
@@ -49,11 +50,12 @@ inline int enemy_mean(uint8_t* rdram,uint32_t props,unsigned color,bool score,bo
     }
     return mean_up(values[0],values[1]);
 }
-inline std::optional<int> food_gain(uint8_t* rdram,uint32_t actor,unsigned color,bool score){
+inline std::optional<int> food_gain(uint8_t* rdram,uint32_t actor,unsigned color,bool score,unsigned native_class=8){
     if(!fruit_mix::range(actor,0x178))return {};
     const auto id=MEM_HU(12,int32_t(actor));
     const int fruit=special::fruit_index(id);
     if(fruit>=0 && lucky_fruit_type && unsigned(6+fruit)==lucky_fruit_type())return 8;
+    if(auto metal=metal_rewards0300::food(color,id,score,native_class))return metal;
     if(no_enemy_score(rdram,actor)){
         if(score)return 0;
         if(hybrid(color))return enemy_mean(rdram,*properties(rdram,actor),color,false);

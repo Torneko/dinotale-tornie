@@ -1,5 +1,7 @@
 #include "collections.hpp"
+#include "game_modes0320.hpp"
 #include "fruit_mix.hpp"
+#include "collection_frustration0283.hpp"
 #include "story_progress.hpp"
 #include "json/json.hpp"
 #include <fstream>
@@ -86,7 +88,8 @@ void initialize(const std::filesystem::path& path){
         if(!ledger.state.valid())throw std::runtime_error("state");
     }catch(...){ledger={};ledger.readable=ledger.saved=false;fprintf(stderr,"[Collection] Invalid ledger preserved; currency and purchases disabled.\n");}
 }
-void start_session(unsigned mode){std::lock_guard lock(mutex);session=mode<2;room_active=false;actors.clear();}
+namespace {bool story_hybrid0320=false,canonical_valid0320=false;unsigned canonical_trial0320=0,canonical_eggs0320=0;}
+void start_session(unsigned mode,unsigned trial,unsigned eggs,bool valid){std::lock_guard lock(mutex);session=mode<2;story_hybrid0320=mode==game_modes0320::StoryHybrid;canonical_valid0320=valid;canonical_trial0320=trial;canonical_eggs0320=eggs;room_active=false;actors.clear();}
 View view(){std::lock_guard lock(mutex);return ledger;}
 bool purchase(Item item){
     std::lock_guard lock(mutex);if(!ready())return false;auto before=ledger.state;
@@ -97,6 +100,10 @@ bool purchase(Item item){
 bool editor_unlocked(){auto v=view();return v.readable && v.state.owns(Item::Editor);}
 bool egg_allowed(uint8_t* rdram,unsigned color){
     std::lock_guard lock(mutex);if(!ready() || color<6 || color>7)return false;
+    if(story_hybrid0320){
+        if(!canonical_valid0320||canonical_trial0320!=0xFFFFFF)return false;
+        return (canonical_eggs0320&(1u<<(color-6))) || ledger.state.owns(color==6?Item::White:Item::Black);
+    }
     auto p=progress::read(rdram,gpr(int32_t(0x807F2000)));
     const auto story=uint32_t(MEM_W(0,gpr(int32_t(0x800F8E5C))));
     if(!progress::valid(p,story) || p.trial!=0xFFFFFF)return false;
@@ -119,8 +126,13 @@ void enter(uint8_t* rdram,unsigned room,uint32_t metadata,bool allowed){
     // have been born. Those calls must not erase the current room bindings.
     if(!fruit_mix::playable(rdram,metadata))return;
     actors.clear();room_active=false;
-    if(!ready() || !session || !allowed || room>=177 || MEM_W(0xCE8,root)!=1)return;
     const unsigned page=MEM_BU(0xF5C,root),column=MEM_BU(0xF5D,root);
+    const bool eligible=ready() && session && allowed && room<177 && MEM_W(0xCE8,root)==1;
+    // The same native room can be cached across modes. Also remove our count
+    // extension when it is next loaded outside this exact vanilla Trial.
+    frustration0283::prepare(rdram,metadata,eligible && room==frustration0283::room &&
+        page==2 && column==3);
+    if(!eligible)return;
     if(page>=6 || column>=4)return;current_level=page*4+column;current_room=room;room_active=true;
     auto& places=ledger.state.levels[current_level].places;bool changed=false;
     const auto meta=gpr(int32_t(metadata)),objects=gpr(int32_t(MEM_W(4,meta)));

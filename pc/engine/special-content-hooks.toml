@@ -121,12 +121,8 @@ func = "func_800431D8"
 before_vram = 0x80043340
 text = "workshop_reward_popup_created(rdram,ctx);"
 
-# Name Entry cycles three complete chalk drawings. Keep its drawing stable;
-# preserve the chosen keyboard/layout, its transition and the cursor timers.
-[[patches.hook]]
-func = "func_80739A40"
-before_vram = 0x80739B08
-text = "ctx->r5=0;"
+# Name Entry uses its original three transparent chalk variants per keyboard.
+# Keep its native frame selector, cursor and transition timers unmodified.
 
 # Pause's live mood estimate counted only eight native life flags. Use the
 # same earned/alive fourteen-color mask as the existing end-of-course tally.
@@ -170,7 +166,7 @@ text = "workshop_pause_hide(rdram,ctx);"
 [[patches.hook]]
 func = "func_807BA478"
 before_vram = 0x807BA4E0
-text = "{ uint32_t color=MEM_W(0,(gpr)(int32_t)0x807F0008); if(color<14)ctx->r25=color; }"
+text = "{ uint32_t color=MEM_W(0,(gpr)(int32_t)0x807F0008); if(color<16)ctx->r25=color; }"
 
 [[patches.hook]]
 func = "func_8002B088"
@@ -299,3 +295,197 @@ text = "workshop_palette_note(rdram,ctx,1);"
 func = "Fault_HungUp"
 before_vram = 0x80071380
 text = "workshop_native_fault(rdram,ctx);"
+
+# Six special identical-fruit endings use safe extended frames 6..11.
+[[patches.hook]]
+func = "func_807A6640"
+before_vram = 0x807A6640
+text = "if(workshop_special_victory(rdram,ctx))return;"
+
+# Additive solo16 resources and selection; six-colour save codec is unchanged.
+[[patches.instruction]]
+func = "func_80050C8C"
+vram = 0x80050C94
+value = 0x2D090008
+[[patches.instruction]]
+func = "func_804A0548"
+vram = 0x804A0584
+value = 0x2405004C
+[[patches.instruction]]
+func = "func_804A0610"
+vram = 0x804A0628
+value = 0x2409000F
+[[patches.instruction]]
+func = "func_804A0954"
+vram = 0x804A096C
+value = 0x2409000F
+[[patches.instruction]]
+func = "func_804A0C98"
+vram = 0x804A0CB0
+value = 0x2409000F
+[[patches.instruction]]
+func = "func_804A0FDC"
+vram = 0x804A0FF4
+value = 0x2409000F
+[[patches.instruction]]
+func = "func_804A1404"
+vram = 0x804A1454
+value = 0x24030010
+[[patches.instruction]]
+func = "workshop_804A4AE0"
+vram = 0x804A4AFC
+value = 0x00000000
+[[patches.hook]]
+func = "workshop_804A4AE0"
+before_vram = 0x804A4AFC
+text = "ctx->r15 = ctx->r15 == 14 ? 6 : ctx->r15 == 15 ? 7 : 0;"
+[[patches.instruction]]
+func = "func_8057D750"
+vram = 0x8057D760
+value = 0x00000000
+[[patches.hook]]
+func = "func_8057D750"
+before_vram = 0x8057D760
+text = "ctx->r24 = MEM_HU(0, ADD32(S32(0x807FD200u), ctx->r15));"
+[[patches.instruction]]
+func = "func_8057D750"
+vram = 0x8057D798
+value = 0x00000000
+[[patches.hook]]
+func = "func_8057D750"
+before_vram = 0x8057D798
+text = "ctx->r5 = MEM_W(0, ADD32(S32(0x807FD220u), ctx->r2));"
+[[patches.instruction]]
+func = "func_8057D750"
+vram = 0x8057D7A0
+value = 0x00000000
+[[patches.hook]]
+func = "func_8057D750"
+before_vram = 0x8057D7A0
+text = "ctx->r6 = MEM_W(0, ADD32(S32(0x807FD260u), ctx->r2));"
+[[patches.instruction]]
+func = "func_8057D7D0"
+vram = 0x8057D824
+value = 0x2A010010
+[[patches.instruction]]
+func = "func_8057D7D0"
+vram = 0x8057D8A8
+value = 0x2A010010
+[[patches.instruction]]
+func = "func_807C36B8"
+vram = 0x807C37E8
+value = 0x00000000
+[[patches.hook]]
+func = "func_807C36B8"
+before_vram = 0x807C37E8
+text = "ctx->r11 = MEM_W(0, ADD32(S32(0x807FD2A0u), ctx->r10));"
+[[patches.instruction]]
+func = "workshop_807F1800"
+vram = 0x807F1828
+value = 0x2D290008
+[[patches.instruction]]
+func = "func_800409F0"
+vram = 0x80040A10
+value = 0x24040010
+[[patches.instruction]]
+func = "workshop_ext_rescue_picker"
+vram = 0x807F3B38
+value = 0x27BDFF90
+[[patches.instruction]]
+func = "workshop_ext_rescue_picker"
+vram = 0x807F3BA0
+value = 0x24070008
+[[patches.instruction]]
+func = "workshop_ext_rescue_picker"
+vram = 0x807F3C04
+value = 0x00000000
+[[patches.hook]]
+func = "workshop_ext_rescue_picker"
+before_vram = 0x807F3C04
+text = "MEM_W(0X0, ctx->r14) = 6;"
+[[patches.instruction]]
+func = "workshop_ext_rescue_picker"
+vram = 0x807F3C38
+value = 0x24020010
+[[patches.instruction]]
+func = "workshop_ext_rescue_picker"
+vram = 0x807F3C84
+value = 0x27BD0070
+[[patches.instruction]]
+func = "workshop_807F1C00"
+vram = 0x807F1C14
+value = 0x2C490010
+
+# Story Hybrid uses separate world receipts and keeps the ordinary draw ledger intact.
+[[patches.hook]]
+func = "workshop_ext_story_event"
+before_vram = 0x807F4144
+text = "if(workshop_story_event0320()){ctx->r2=0;return;}"
+
+[[patches.hook]]
+func = "func_80710B24"
+before_vram = 0x80710C2C
+text = "workshop_story_world_arm0320(rdram,ctx);"
+
+[[patches.hook]]
+func = "func_80710B24"
+before_vram = 0x80710C34
+text = "workshop_story_world_commit0320(rdram,ctx);"
+
+[[patches.hook]]
+func = "func_80791E90"
+before_vram = 0x80792064
+text = "workshop_story_bowser_arm0320(rdram,ctx);"
+
+[[patches.hook]]
+func = "func_80791E90"
+before_vram = 0x8079207C
+text = "workshop_story_bowser_commit0320(rdram,ctx);"
+
+
+# Story Hard keeps its roster and successful-run receipts in an independent journal.
+[[patches.hook]]
+func = "workshop_804445A4"
+before_vram = 0x80444838
+text = "workshop_hard_init0330(rdram,ctx);"
+
+[[patches.hook]]
+func = "func_80457090"
+before_vram = 0x80457104
+text = "workshop_hard_new0330(rdram,ctx,1);"
+
+[[patches.hook]]
+func = "func_80457090"
+before_vram = 0x80457124
+text = "workshop_hard_new0330(rdram,ctx,0);"
+
+[[patches.hook]]
+func = "func_80456FA0"
+before_vram = 0x80456FA0
+text = "if(workshop_hard_continue0330(rdram,ctx))return;"
+
+[[patches.hook]]
+func = "workshop_ext_eeprom_write"
+before_vram = 0x807F3D98
+text = "workshop_hard_save0330(rdram,ctx);"
+
+[[patches.hook]]
+func = "workshop_807F1100"
+before_vram = 0x807F1174
+text = "workshop_hard_death0330(rdram,ctx);"
+
+[[patches.hook]]
+func = "workshop_807F1C00"
+before_vram = 0x807F1C5C
+text = "workshop_hard_rescue0330(rdram,ctx);"
+
+[[patches.hook]]
+func = "workshop_ext_rescue_capacity"
+before_vram = 0x807F3AE0
+text = "if(workshop_hard_capacity0330(rdram,ctx))return;"
+
+[[patches.hook]]
+func = "workshop_ext_rescue_picker"
+before_vram = 0x807F3B38
+text = "if(workshop_hard_picker0330(rdram,ctx))return;"
+

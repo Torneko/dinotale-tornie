@@ -17,7 +17,7 @@
 #endif
 namespace workshop::hybrid_mode {
 namespace {
-std::atomic_bool enabled=false,can_read=true,last_saved=true;
+std::atomic_bool enabled=false,trial_records_enabled=false,can_read=true,last_saved=true;
 std::filesystem::path filename;
 using Source=std::array<uint32_t,5>;
 std::map<Source,unsigned> colors;
@@ -47,7 +47,7 @@ bool persist(){
 }
 }
 void initialize(const std::filesystem::path& path){
-    filename=path;enabled=false;can_read=last_saved=true;normal_captured=has_records=false;normal_records.fill(0);hybrid_records.fill(0);
+    filename=path;enabled=false;trial_records_enabled=false;can_read=last_saved=true;normal_captured=has_records=false;normal_records.fill(0);hybrid_records.fill(0);
     colors.clear();actors.clear();lucky_levels.clear();room_ready=false;custom_colors.clear();custom_rooms.clear();
     lucky=std::uniform_int_distribution<unsigned>(0,5)(*[](){static std::mt19937 random(std::random_device{}());return &random;}());
     try{
@@ -61,8 +61,10 @@ void initialize(const std::filesystem::path& path){
 }
 bool readable(){return can_read;}
 bool saved(){return last_saved;}
-void activate(bool value){
+void activate(bool value,bool use_hybrid_trial_records){
+    trial_records_enabled=false;normal_captured=false;
     enabled=value;actors.clear();colors.clear();lucky_levels.clear();room_ready=false;
+    trial_records_enabled=value && use_hybrid_trial_records;
     rewards::custom_enemy_variant=(value || !custom_colors.empty())?enemy_variant:nullptr;
     rewards::lucky_fruit_type=value?lucky_type:nullptr;
 }
@@ -121,7 +123,7 @@ void recolored(uint8_t* rdram,uint32_t actor){
     fprintf(stderr,"[HybridMode] recolor actor=%08X color=%u\n",actor,color);
 }
 void records_loaded(uint8_t* rdram,uint32_t payload){
-    if(!active() || !fruit_mix::range(payload,1018))return;
+    if(!trial_records_enabled || !fruit_mix::range(payload,1018))return;
     for(unsigned i=0;i<1000;i++)normal_records[i]=MEM_BU(int(i+4),int32_t(payload));
     normal_captured=true;
     // The original codec's forward glyph table protects the same native
@@ -131,7 +133,7 @@ void records_loaded(uint8_t* rdram,uint32_t payload){
     fprintf(stderr,"[HybridMode] Separate records loaded; ordinary scores preserved.\n");
 }
 bool records_saving(uint8_t* rdram,uint32_t payload,uint32_t buffer){
-    if(!active())return true;
+    if(!trial_records_enabled)return true;
     if(!can_read || !normal_captured || !fruit_mix::range(payload,1018) || !fruit_mix::range(buffer,1018))return false;
     for(unsigned i=0;i<1000;i++)hybrid_records[i]=MEM_BU(int(i+4),int32_t(payload));
     last_saved=persist();if(!last_saved)return false;has_records=true;

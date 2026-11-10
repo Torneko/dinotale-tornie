@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.21)
+project(DinoTalePortableLauncher LANGUAGES CXX RC)
+add_executable(DinoTalePortable WIN32 DinoTale.cpp app.rc)
+target_compile_features(DinoTalePortable PRIVATE cxx_std_20)
+target_link_libraries(DinoTalePortable PRIVATE user32 shell32)
+set_target_properties(DinoTalePortable PROPERTIES OUTPUT_NAME DinoTale MSVC_RUNTIME_LIBRARY MultiThreaded)

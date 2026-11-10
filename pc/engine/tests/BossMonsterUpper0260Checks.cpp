@@ -1,0 +1,35 @@
+#include "../boss_battle_runtime0250.hpp"
+#include "../boss_driver_bridge0260.hpp"
+#define main monster_restock_legacy_main_not_executed
+#include "BossMonsterRestock0260Checks.cpp"
+#undef main
+#include <fstream>
+#include <iterator>
+#include <vector>
+namespace n=workshop::boss_native;namespace upper=workshop::boss_monster_upper0260;namespace bridge=workshop::boss_driver_bridge0260;namespace m=workshop::boss_monster_aim0260;
+struct Ram {
+ std::vector<uint8_t> bytes;uint8_t* rdram;uint32_t player,data,meta,def;
+ explicit Ram(const std::vector<uint8_t>& source):bytes(source),rdram(bytes.data()),player(n::word(rdram,0x800F8828)),data(n::word(rdram,player+0x1F4)),meta(n::word(rdram,player+0x174)),def(n::word(rdram,meta)){}
+ void w(uint32_t a,uint32_t v){MEM_W(0,n::base(a))=v;}void b(uint32_t a,unsigned v){MEM_B(0,n::base(a))=uint8_t(v);}void fl(uint32_t a,float v){w(a,std::bit_cast<uint32_t>(v));}
+ bool supports(){const auto before=bytes;const bool result=upper::observe(rdram,player,170,3);need(bytes==before,"Support observation preserves every native byte");return result;}
+ void apply(Fixture& f){f.in.player=player;f.in.room=170;f.in.encounter=3;f.in.x=m::scalar(rdram,player+0x84);f.in.y=m::scalar(rdram,player+0x88);f.in.grounded=!n::byte(rdram,data+0xF4);f.in.horizontal_speed=m::scalar(rdram,player+0xC4);f.in.horizontal_speed_observed=true;bridge::observe_monster_upper_navigation(rdram,player,170,3,f.in);
+  const auto tongue=workshop::boss_native_mouth0260::observe_ordinary_tongue(rdram,player);f.in.native_tongue_observed=f.in.native_tongue_known=tongue.observed;f.in.native_tongue_ready=tongue.observed&&tongue.ready;f.in.native_tongue_phase=tongue.phase;f.in.native_tongue_live=tongue.live;f.in.native_tongue_callback_pending=tongue.callback_pending;f.in.native_tongue_cancelled_idle=tongue.cancelled_idle;f.in.mouth_full=n::word(rdram,data+0x164)!=0;
+ }
+};
+int main(int argc,char** argv){checks=0;need(argc==2,"Supply the actual unfenced diagnostic upper-platform capture");std::ifstream stream(argv[1],std::ios::binary);std::vector<uint8_t> captured((std::istreambuf_iterator<char>(stream)),{});need(captured.size()==0x800000,"Actual diagnostic capture has exactly8MiB; no victory fence is inferred");
+ {Ram r(captured);need(n::actor(r.rdram,r.player,0x4001)&&r.supports(),"Actual P1 at394/321 on native151 static support passes the strict feet/bimap proof");need(m::scalar(r.rdram,r.player+0x6C)==.8f,"Actual render scale is0.8 but WORLD foot offsets must remain4/16");need(!upper::observe(r.rdram,r.player,169,3)&&!upper::observe(r.rdram,r.player,170,2),"Wrong room or encounter cannot reuse the real support proof");}
+ for(unsigned fault=0;fault<15;++fault){Ram r(captured);if(fault==0)r.w(0x800F8828,0);if(fault==1)r.b(r.data+0xF4,1);if(fault==2)r.w(r.player+0x180,0x800C88E0);if(fault==3)r.b(r.player+0x17D,3);if(fault==4)r.fl(r.player+0x84,312);if(fault==5)r.fl(r.player+0x88,465);if(fault==6)r.w(r.meta+4,0x800C88E0);if(fault==7)r.w(r.def+0x2C,11);if(fault==8)r.w(r.def+0x30,0);if(fault==9)r.w(r.def+0x34,0);if(fault==10)r.fl(n::word(r.rdram,r.def+0x34)+3*4,12);if(fault==11)r.fl(r.player+0x84,std::numeric_limits<float>::quiet_NaN());if(fault==12)r.fl(r.player+0x88,std::numeric_limits<float>::infinity());if(fault==13)r.w(0x800F8810,0);if(fault==14){auto* rdram=r.rdram;MEM_H(12,n::base(r.player))=0x4004;}need(!r.supports(),"Foreign/airborne/attached/lower-floor/unknown/corrupt-foot source never invents upper support");}
+ {Ram r(captured);Fixture f;r.apply(f);f.in.reserves=0;need(f.in.monster_upper_navigation&&f.in.monster_upper_supported,"The ACTUAL Bridge adapter supplies the strict upper-support observations");f.in.horizontal_speed=3;need(neutral(f.at(100))&&!f.controller.snapshot().supply_ready,"Upper arrival with real-shaped travel inertia brakes before any A/B");f.in.horizontal_speed=.0001f;need(neutral(f.at(101))&&!f.controller.snapshot().supply_ready,"Even tiny nonzero C4 cannot be called settled");f.in.horizontal_speed=0;need(neutral(f.at(102))&&!f.controller.snapshot().supply_ready,"First stopped native observation stays neutral");f.at(103);need(f.controller.snapshot().supply_ready,"Second consecutive stopped real-support observation admits ordinary refill");
+  // HOST input boundary only: R6 is a subsequent observed stock, not a RAM
+  // write or a simulated ingestion. The real run separately provedR0→R6.
+  f.in.reserves=6;need(neutral(f.at(104))&&!f.controller.snapshot().monster_upper_combat,"Full stock still needs its own first idle/stop observation");need(neutral(f.at(105))&&f.controller.snapshot().monster_upper_combat&&!f.controller.snapshot().monster_returning,"Second full-stock stop observation resumes combat on the PROVED static platform");
+  f.targets[0].clear_path=f.targets[1].clear_path=false;for(unsigned vi=106;vi<126;++vi){const auto out=f.at(vi);need(neutral(out)&&f.controller.snapshot().monster_upper_combat,"A temporarily obstructed Monster eye waits on the static support without A or chasing left");}
+  f.targets[0].clear_path=true;const auto face=f.at(126);need(!(face.buttons&d::jump_button)&&f.controller.snapshot().phase==d::Phase::Face,"A real clear ray resumes ordinary Face without a return jump");need(face.x>0,"The static combat anchor faces its right-hand target instead of requesting a walk left to312");
+ }
+ for(unsigned fault=0;fault<9;++fault){Ram r(captured);Fixture f;r.apply(f);f.in.reserves=0;f.at(100);f.at(101);f.in.reserves=6;f.at(102);
+  if(fault==0)f.in.monster_upper_supported=false;if(fault==1)f.in.grounded=false;if(fault==2)f.in.horizontal_speed=.01f;if(fault==3)f.in.mouth_full=true;if(fault==4)f.in.native_tongue_live=true;if(fault==5)f.in.native_tongue_callback_pending=true;if(fault==6)f.in.native_tongue_known=false;if(fault==7)f.in.native_tongue_observed=false;if(fault==8)f.in.controls=false;
+  f.at(103);need(!f.controller.snapshot().monster_upper_combat,"Fake supplyReady/coordinates, movement or unfinished/unknown mouth cannot authorize upper combat");}
+ {Ram r(captured);Fixture f;r.apply(f);f.in.reserves=0;f.at(100);f.at(101);f.in.reserves=6;f.at(102);f.at(103);need(f.controller.snapshot().monster_upper_combat,"Support-loss fixture first proves actual upper combat");r.fl(r.player+0x88,465);r.apply(f);f.at(104);need(!f.controller.snapshot().monster_upper_combat&&f.controller.snapshot().monster_refilling,"Loss of actual ground returns to observed native recovery, never retained flight permission");}
+ {Ram r(captured);Fixture f;r.apply(f);f.in.reserves=0;f.at(100);f.in.monster_upper_supported=false;f.at(101);f.in.monster_upper_supported=true;need(neutral(f.at(102))&&!f.controller.snapshot().supply_ready,"Lost support invalidates the earlier first stopped arrival observation");f.at(103);need(f.controller.snapshot().supply_ready,"Two new consecutive supported observations restore readiness");}
+ std::printf("BossMonsterUpper0260Checks: %u PASS (actual diagnostic RAM, strict feet/map and real Bridge/Driver composition; HOST reserve observations explicit, no landing/ingestion/victory claim)\n",checks);
+}

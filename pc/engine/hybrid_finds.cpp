@@ -1,4 +1,5 @@
 #include "hybrid_finds.hpp"
+#include "metal_yoshis0300.hpp"
 #include "json/json.hpp"
 #include <array>
 #include <cmath>
@@ -14,7 +15,7 @@
 namespace workshop::finds {
 namespace {
 std::mutex mutex;View ledger;std::filesystem::path filename;
-unsigned level=24,room=177,selected=6,carried=0;uint32_t carried_actor=0;bool enabled=false,taken=false;
+unsigned level=24,room=177,selected=8,carried=0;uint32_t carried_actor=0;bool enabled=false,taken=false;
 unsigned pickup_sounded=0;
 std::optional<std::array<unsigned,4>> place;
 struct Egg {unsigned color,room;bool scene;};
@@ -34,7 +35,16 @@ bool persist(){
         return true;
     }catch(const std::exception& e){fprintf(stderr,"[HybridFind] Save failed: %s\n",e.what());return false;}
 }
-void reset(){level=24;room=177;selected=6;carried=carried_actor=pickup_sounded=0;enabled=taken=false;place.reset();actors.clear();}
+void reset(){level=24;room=177;selected=8;carried=carried_actor=pickup_sounded=0;enabled=taken=false;place.reset();actors.clear();}
+// Called only with mutex held. Already migrated ownership is authoritative;
+// absent ownership may be seeded only by an explicitly validated source.
+void migrate_locked(uint8_t* rdram,const progress::State& authoritative,unsigned story,bool sourceValid){
+    if(!ledger.initialized || !ledger.readable)return;
+    if(ledger.migrated){MEM_W(0,int32_t(0x807FC144))=0xF17D0000|ledger.found;return;}
+    if(!sourceValid || !progress::valid(authoritative,story))return;
+    ledger.found=progress::unlocked(authoritative,story);ledger.saved=persist();
+    if(ledger.saved){ledger.migrated=true;MEM_W(0,int32_t(0x807FC144))=0xF17D0000|ledger.found;fprintf(stderr,"[HybridFind] Existing Yoshis retained: %02X.\n",ledger.found);}
+}
 }
 void initialize(const std::filesystem::path& path){
     std::lock_guard lock(mutex);ledger={};ledger.initialized=true;filename=path;reset();
@@ -49,11 +59,13 @@ void initialize(const std::filesystem::path& path){
 }
 void migrate(uint8_t* rdram,unsigned story){
     std::lock_guard lock(mutex);
+    // Preserve the original API, including no payload read before its guards.
     if(!ledger.initialized || !ledger.readable)return;
     if(ledger.migrated){MEM_W(0,int32_t(0x807FC144))=0xF17D0000|ledger.found;return;}
-    auto p=progress::read(rdram,gpr(int32_t(0x807F2000)));if(!progress::valid(p,story))return;
-    ledger.found=progress::unlocked(p,story);ledger.saved=persist();
-    if(ledger.saved){ledger.migrated=true;MEM_W(0,int32_t(0x807FC144))=0xF17D0000|ledger.found;fprintf(stderr,"[HybridFind] Existing Yoshis retained: %02X.\n",ledger.found);}
+    migrate_locked(rdram,progress::read(rdram,gpr(int32_t(0x807F2000))),story,true);
+}
+void migrate(uint8_t* rdram,const progress::State& authoritative,unsigned story,bool sourceValid){
+    std::lock_guard lock(mutex);migrate_locked(rdram,authoritative,story,sourceValid);
 }
 View view(){std::lock_guard lock(mutex);return ledger;}
 unsigned available(unsigned eligible){
@@ -73,14 +85,15 @@ std::optional<unsigned> reserve(unsigned eligible,unsigned source,unsigned x,uns
     if(!enabled || taken || whitePresent)return {};
     const std::array<unsigned,4> key{room,source,x,y};
     if(place && *place!=key)return {};
-    const unsigned waiting=eligible&~ledger.found&63;
+    // Preserve the established six-color queue, then append eligible metals.
+    const unsigned waiting=(eligible&~ledger.found&63)|(metal_yoshis0300::search_mask()<<6);
     if(!waiting)return {};
     if(!place){place=key;selected=std::countr_zero(waiting);
         fprintf(stderr,"[HybridFind] Reserved color=%u room=%u source=%04X xy=%08X,%08X.\n",selected+8,room,source,x,y);}
     return selected;
 }
 void created(uint32_t actor){std::lock_guard lock(mutex);actors.erase(actor);}
-void spawned(uint32_t actor,unsigned color,bool scene){std::lock_guard lock(mutex);if(actor && color<6)actors[actor]={color,room,scene};}
+void spawned(uint32_t actor,unsigned color,bool scene){std::lock_guard lock(mutex);if(actor && color<8)actors[actor]={color,room,scene};}
 bool scene_actor(uint32_t actor){std::lock_guard lock(mutex);auto it=actors.find(actor);return it!=actors.end() && it->second.scene;}
 bool egg_state(uint32_t actor,unsigned state){
     std::lock_guard lock(mutex);auto it=actors.find(actor);if(it==actors.end())return false;
@@ -93,7 +106,8 @@ bool take_pickup_sound(uint32_t actor,unsigned state){
     auto it=actors.find(actor);
     if(!enabled || it==actors.end() || (state!=4 && state!=5) || actor!=carried_actor)return false;
     const auto bit=1u<<it->second.color;
-    if((ledger.found|pickup_sounded)&bit)return false;
+    const auto known=ledger.found|(metal_yoshis0300::view().found<<6);
+    if((known|pickup_sounded)&bit)return false;
     pickup_sounded|=bit;return true;
 }
 uint32_t touching(uint8_t* rdram,uint32_t player){
@@ -107,7 +121,7 @@ uint32_t touching(uint8_t* rdram,uint32_t player){
     for(auto [address,entry]:actors){
         if(address<0x80000400 || address>0x807FFC00)continue;
         const auto a=gpr(int32_t(address));
-        if(!entry.scene || entry.room!=room || (ledger.found&(1u<<entry.color)) || MEM_W(0,a)!=0x19971110 || MEM_HU(12,a)!=0x401D
+        if(!entry.scene || entry.room!=room || ((ledger.found|(metal_yoshis0300::view().found<<6))&(1u<<entry.color)) || MEM_W(0,a)!=0x19971110 || MEM_HU(12,a)!=0x401D
             || MEM_BU(0x10,a)!=1 || MEM_BU(0x30,a)>=4 || MEM_W(0x180,a))continue;
         // These scene eggs are outside the native carried-egg pool. Claim on
         // body contact, then let the native parent/state machinery carry them.
@@ -118,8 +132,21 @@ uint32_t touching(uint8_t* rdram,uint32_t player){
     return 0;
 }
 unsigned pending(){std::lock_guard lock(mutex);return carried;}
+unsigned pending_hybrids(){std::lock_guard lock(mutex);return carried&63;}
+unsigned pending_metals(){std::lock_guard lock(mutex);return (carried>>6)&3;}
 bool finish(uint8_t* rdram){
     std::lock_guard lock(mutex);if(!enabled || !carried || !ledger.readable || !ledger.migrated)return false;
+    if(carried&0xC0){
+        if((carried&~0xC0u)||!std::has_single_bit(carried))return false;
+        const unsigned color=8+unsigned(std::countr_zero(carried));
+        if(!metal_yoshis0300::acquire(color))return false;
+        // Only the transient extra-life projection grows to eight bits. Never
+        // put Gold/Silver in the legacy six-life payload or native egg flags.
+        MEM_W(0,int32_t(0x807F1000))|=carried;
+        carried=carried_actor=0;
+        fprintf(stderr,"[MetalYoshi] carried-native-egg-finished color=%u found=%u legacySixBitLedgerUnchanged=1\n",color,metal_yoshis0300::view().found);
+        return true;
+    }
     const unsigned added=carried&~ledger.found;if(!added)return false;
     const unsigned before=ledger.found;ledger.found|=added;ledger.saved=persist();
     if(!ledger.saved){ledger.found=before;return false;}

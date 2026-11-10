@@ -8,3 +8,6 @@ void workshop_menu_start_mode(int mode);
 bool workshop_menu_wait_parent(unsigned pid);
 void workshop_menu_restore_window();
 int workshop_menu_take_boot_mode();
+
+// Atomic launch mode; -1 before a native session is selected.
+int workshop_menu_session_mode();

@@ -19,10 +19,18 @@ public sealed class NativeTerrainMap {
     public int Width {get;init;}public int Height {get;init;}public int TileWidth {get;init;}public int TileHeight {get;init;}public int PageHeight {get;init;}
     public float WorldX {get;init;}public float WorldY {get;init;}
     public byte[] Pages {get;init;}=[];public int LoadedPages {get;init;}
-    public byte[] Pixels {get;init;}=[];public uint[] Palette {get;init;}=[];public ushort[] Tiles {get;init;}=[];public ushort[] Collisions {get;init;}=[];
+    public byte[] Pixels {get;init;}=[];public uint[] Palette {get;init;}=[];public ushort[] Tiles {get;init;}=[];public ushort[] RawTiles {get;init;}=[];public ushort[] AnimationFrames {get;init;}=[];public ushort[] Collisions {get;init;}=[];
     // Native tile rows alternate between the vertical 256-pixel pages.
     public int CellIndex(int x,int y){int columns=Width/PageHeight,rowsPerPage=PageHeight/TileHeight,page=Pages[(y/rowsPerPage)*columns+x/rowsPerPage];return page==255?-1:(y%rowsPerPage)*LoadedPages*rowsPerPage+page*rowsPerPage+x%rowsPerPage;}
     public ushort CollisionAt(float x,float y){int tx=(int)MathF.Floor((x-WorldX)/TileWidth),ty=(int)MathF.Floor((y-WorldY)/TileHeight);return tx<0||ty<0||tx>=Width/TileWidth||ty>=Height/TileHeight?(ushort)0:CellIndex(tx,ty) is int cell && cell>=0?Collisions[cell]:(ushort)0;}
+    public bool TryCell(int x,int y,out int cell){cell=-1;if(x<0 || y<0 || x>=Width/TileWidth || y>=Height/TileHeight)return false;cell=CellIndex(x,y);return cell>=0 && cell<RawTiles.Length;}
+    public bool ValidTile(ushort tile)=>tile==65535 || tile<32768 && tile<Pixels.Length/(TileWidth*TileHeight) || tile>=32768 && tile!=65535 && (tile&32767)<AnimationFrames.Length && (AnimationFrames[tile&32767]==32768 || AnimationFrames[tile&32767]<Pixels.Length/(TileWidth*TileHeight));
+    public ushort Resolve(ushort tile){if(!ValidTile(tile))throw new InvalidDataException("Tuile incompatible avec ce terrain.");if(tile==65535 || tile<32768)return tile;ushort frame=AnimationFrames[tile&32767];return frame==32768?(ushort)65535:frame;}
+    public NativeTerrainMap Preview(IEnumerable<TerrainCellChange> changes){
+        var raw=(ushort[])RawTiles.Clone();var tiles=(ushort[])Tiles.Clone();var collision=(ushort[])Collisions.Clone();
+        foreach(var c in changes.Where(c=>c.ResourceId==ResourceId)){if(c.Cell<0 || c.Cell>=raw.Length || !ValidTile(c.Tile))throw new InvalidDataException("Modification de terrain invalide.");raw[c.Cell]=c.Tile;tiles[c.Cell]=Resolve(c.Tile);collision[c.Cell]=c.Collision;}
+        return new(){ResourceId=ResourceId,Width=Width,Height=Height,TileWidth=TileWidth,TileHeight=TileHeight,PageHeight=PageHeight,WorldX=WorldX,WorldY=WorldY,Pages=Pages,LoadedPages=LoadedPages,Pixels=Pixels,Palette=Palette,Tiles=tiles,RawTiles=raw,AnimationFrames=AnimationFrames,Collisions=collision};
+    }
     public int[] Rasterize(){
         var result=new int[checked(Width*Height)];int area=TileWidth*TileHeight;var atlas=new int[Pixels.Length];for(int p=0;p<atlas.Length;p++)atlas[p]=unchecked((int)Palette[Pixels[p]]);
         for(int y=0;y<Height/TileHeight;y++)for(int x=0;x<Width/TileWidth;x++){int cell=CellIndex(x,y);if(cell<0)continue;int tile=Tiles[cell];if(tile==65535)continue;for(int row=0;row<TileHeight;row++)Array.Copy(atlas,tile*area+row*TileWidth,result,(y*TileHeight+row)*Width+x*TileWidth,TileWidth);}
@@ -54,9 +62,9 @@ public sealed partial class VanillaRom {
             if(page!=256 || width%256!=0 || pixels.Length%(tw*th)!=0 || palette.Length!=512 || tiles.Length%512!=0 || loaded<1 || collision.Length!=tiles.Length || pages.Take(width/256*(height/256)).Any(v=>v!=255 && v>=loaded) || animation.Length%10!=0)throw new InvalidDataException("Cartes du terrain incompatibles.");
             int pageCells=width/256*(height/256);var pageGrid=Enumerable.Repeat((byte)255,pageCells).ToArray();Array.Copy(pages,pageGrid,Math.Min(pageCells,pages.Length));
             var colors=new uint[256];for(int i=0;i<256;i++){uint c=BinaryPrimitives.ReadUInt16BigEndian(palette.AsSpan(i*2));colors[i]=((c&1)!=0?0xff000000u:0u)|((c>>11)*255/31<<16)|(((c>>6)&31)*255/31<<8)|((c>>1)&31)*255/31;}
-            cells=tiles.Length/2;var map=new ushort[cells];var mask=new ushort[cells];for(int i=0;i<cells;i++){map[i]=BinaryPrimitives.ReadUInt16BigEndian(tiles.AsSpan(i*2));mask[i]=BinaryPrimitives.ReadUInt16BigEndian(collision.AsSpan(i*2));if(map[i]!=65535 && map[i]>=32768){int animated=(map[i]&32767)*10;if(animated+2>animation.Length)throw new InvalidDataException("Animation de terrain invalide.");map[i]=BinaryPrimitives.ReadUInt16BigEndian(animation.AsSpan(animated));if(map[i]==32768)map[i]=65535;}
+            cells=tiles.Length/2;var map=new ushort[cells];var raw=new ushort[cells];var frames=Enumerable.Range(0,animation.Length/10).Select(i=>BinaryPrimitives.ReadUInt16BigEndian(animation.AsSpan(i*10))).ToArray();var mask=new ushort[cells];for(int i=0;i<cells;i++){map[i]=raw[i]=BinaryPrimitives.ReadUInt16BigEndian(tiles.AsSpan(i*2));mask[i]=BinaryPrimitives.ReadUInt16BigEndian(collision.AsSpan(i*2));if(map[i]!=65535 && map[i]>=32768){int animated=(map[i]&32767)*10;if(animated+2>animation.Length)throw new InvalidDataException("Animation de terrain invalide.");map[i]=BinaryPrimitives.ReadUInt16BigEndian(animation.AsSpan(animated));if(map[i]==32768)map[i]=65535;}
                 if(map[i]!=65535 && map[i]>=tileCount)throw new InvalidDataException("Indice de tuile du terrain invalide.");}
-            result.Add(new(){ResourceId=placement.ObjectId,Width=width,Height=height,TileWidth=tw,TileHeight=th,PageHeight=page,WorldX=placement.X-160,WorldY=placement.Y-120,Pages=pageGrid,LoadedPages=loaded,Pixels=pixels,Palette=colors,Tiles=map,Collisions=mask});
+            result.Add(new(){ResourceId=placement.ObjectId,Width=width,Height=height,TileWidth=tw,TileHeight=th,PageHeight=page,WorldX=placement.X-160,WorldY=placement.Y-120,Pages=pageGrid,LoadedPages=loaded,Pixels=pixels,Palette=colors,Tiles=map,RawTiles=raw,AnimationFrames=frames,Collisions=mask});
         }return result;
     }
     public NativePassage? Passage(ushort id){

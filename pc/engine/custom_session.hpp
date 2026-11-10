@@ -7,6 +7,7 @@ bool active();
 bool ready();
 bool saved();
 int preferred_color();
+void release_preferred_color();
 int source_stage();
 void navigation(unsigned frame,uint16_t* buttons,float* x,float* y);
 void finish(uint8_t* rdram);

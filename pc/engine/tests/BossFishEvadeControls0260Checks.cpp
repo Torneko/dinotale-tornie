@@ -1,0 +1,37 @@
+#define FISH_RECOVERY_FIXTURE_ONLY
+#include "BossFishRecovery0260Checks.cpp"
+#undef FISH_RECOVERY_FIXTURE_ONLY
+static void threat(Control& f){f.in.fish_evade_observed=f.in.fish_evade_imminent=f.in.fish_evade_head_clear=f.in.fish_evade_generation_valid=true;f.in.fish_threat_actor=0x800C9A44;f.in.fish_threat_birth=1;f.in.fish_threat_step=6;}
+static void aimed(Control& f){f.in.primary_state=3;f.in.aiming_actor=0x800C6AB4;f.in.reticle_actor=0x800C3D6C;f.in.reticle_x=f.targets[0].x;f.in.reticle_y=f.targets[0].y;}
+static unsigned second_edge(Control& f){const auto epoch=f.cooldown();f.in.throw_mode=d::ThrowMode::SecondPress;aimed(f);for(unsigned age=66;age<=70;++age)f.at(epoch+age);need(f.controller.snapshot().phase==d::Phase::Release,"HOST reticle observations reach the actual second-press release interval");return epoch+71;}
+int main(int argc,char** argv){try{
+ checks=0;need(argc==2,"Supply actual b2 diagnostic RAM for the shared Bridge-reader composition");auto captured=load(argv[1]);auto* ram=captured.data();const auto player=n::word(ram,0x800F8828);
+ {Control f(player);const auto epoch=f.cooldown();aimed(f);threat(f);const auto before=f.controller.snapshot();const auto first=f.at(epoch+10);need(first.buttons==d::jump_button&&first.x==0&&first.y==0,"An actual owned4005 during Cooldown gets only ordinary A, preserving the old Hold-release command/axes");need(f.controller.snapshot().phase==before.phase&&f.controller.snapshot().phase_vi==before.phase_vi,"The evasion overlay does not restart or replace the shot FSM clock");need(equal(first,f.at(epoch+10)),"SameVI A output is idempotent");
+  f.in.fish_evade_imminent=false;for(unsigned age=1;age<18;++age){const auto out=f.at(epoch+10+age);need((out.buttons&d::jump_button)!=0,"A continues for exactly18VI after the observed risk, even as the rising box passes");}need(!(f.at(epoch+28).buttons&d::jump_button),"Age18 releases A without extending the gesture");
+ }
+ {Control f(player);const auto epoch=f.cooldown();aimed(f);f.at(epoch+66);threat(f);const auto out=f.at(epoch+67);need((out.buttons&(d::jump_button|d::egg_button))==(d::jump_button|d::egg_button),"While native Hold-mode aiming still holds Z, adding A preserves that Z hold");}
+ {Control f(player);const auto edge=second_edge(f);threat(f);const auto first=f.at(edge);need((first.buttons&d::jump_button)&&!(first.buttons&d::egg_button)&&f.controller.snapshot().fish_evade_pending_z,"SecondPress fresh A suppresses the coincident Z edge that Native415FC would consume");const auto phase=f.controller.snapshot().phase_vi;
+  const auto fresh=f.at(edge+1);need((fresh.buttons&(d::jump_button|d::egg_button))==(d::jump_button|d::egg_button)&&!f.controller.snapshot().fish_evade_pending_z,"NextVI frontA is gone and a still-aligned real reticle receives a FRESH ordinary second Z");need(f.controller.snapshot().phase_vi==phase,"Reissuing fresh Z does not rewind the native shot phase epoch");need(f.at(edge+2).buttons&d::egg_button,"Fresh second Z holds for two ordinary updates");need(!(f.at(edge+3).buttons&d::egg_button),"The second Z pulse is released after those two updates");
+ }
+ {Control f(player);const auto edge=second_edge(f);threat(f);f.at(edge);f.in.reticle_x=f.in.x+2;f.in.reticle_y=f.in.y+2;
+  need(!(f.at(edge+1).buttons&d::egg_button)&&f.controller.snapshot().fish_evade_pending_z,"A short/invalid actual reticle cannot release a queued Z after the jump");const auto cancel=f.at(edge+60);need((cancel.buttons&d::tongue_button)&&!(cancel.buttons&d::jump_button)&&f.controller.snapshot().phase==d::Phase::CancelAim,"A missing safe second-Z window ends by bounded ordinary B cancellation, never a forced shot");
+ }
+ for(unsigned fault=0;fault<11;++fault){Control f(player);const auto epoch=f.cooldown();aimed(f);threat(f);
+  if(fault==0)f.in.fish_evade_observed=false;if(fault==1)f.in.fish_evade_imminent=false;if(fault==2)f.in.fish_evade_head_clear=false;if(fault==3)f.in.fish_evade_generation_valid=false;if(fault==4)f.in.fish_navigation=false;if(fault==5)f.in.qa_bird=true;if(fault==6)f.in.native_tongue_known=false;if(fault==7)f.in.native_tongue_observed=false;if(fault==8)f.in.native_tongue_live=true;if(fault==9)f.in.native_tongue_callback_pending=true;if(fault==10)f.in.mouth_full=true;
+  need(!(f.at(epoch+10).buttons&d::jump_button),"Foreign/unknown geometry, epoch, qaBird or an unfinished mouth cannot authorize the new A overlay");
+ }
+ {Control f(player);const auto epoch=f.cooldown();aimed(f);threat(f);f.at(epoch+10);f.in.fish_evade_generation_valid=false;need(!(f.at(epoch+11).buttons&d::jump_button),"Changing the owned threat generation ends the remaining A hold immediately");}
+ {Control f(player);const auto epoch=f.cooldown();aimed(f);threat(f);f.at(epoch+10);f.in.primary_state=4;f.in.aiming_actor=0;const auto out=f.at(epoch+11);need((out.buttons&d::jump_button)&&!(out.buttons&(d::egg_button|d::tongue_button))&&f.controller.snapshot().phase==d::Phase::Cooldown,"After a HOST native4005-consumed boundary only the existing A hold continues; no new Z or throw-state override is created");}
+ // Actual source geometry + actual shared Bridge adapter. Changes below are
+ // labelled HOST reconstruction of trace2653, not an alleged native snapshot.
+ {need(r::configure("FishEvadeComposite",1,true,true,4),"Explicit HOST diagnostic campaign");r::rooms::configure(r::session.plan());r::enter_room(52);need(r::session.enter_fight(97,player),"Real Session owns the captured player/source97");r::bound={0x800C9A44,0x800C9CC0,0,0};for(unsigned member=0;member<2;++member)need(r::variants::bind(ram,member,r::bound[member]),"Real Variants identity API supplies monotonically owned Fish generations");bridge::configure(false);
+  auto scalar=[&](uint32_t a,float value){word(ram,a,std::bit_cast<uint32_t>(value));};const auto root=r::bound[0],factory=n::word(ram,n::word(ram,root+0x168)+0x40);
+  byte(ram,root+0x30,15);word(ram,root+0x20,factory+0x305C);scalar(root+0x84,387.79984f);scalar(root+0x88,301.60001f);scalar(root+0xC4,-.9f);scalar(root+0xC8,-4.1f);scalar(player+0x84,372.44635f);scalar(player+0x88,273);
+  const auto before=captured;Control f(player);f.cooldown();bridge::controller=f.controller;d::Input input=f.in;input.vi=2653;
+  bridge::observe_fish_navigation(ram,player,171,4,f.centers,input);need(captured==before&&input.fish_evade_observed&&input.fish_evade_imminent&&input.fish_evade_head_clear,"ACTUAL shared Bridge adapter reads the HOST2653 rising pose using the real native scales/offsets/mirror, with8MiB unchanged");
+  aimed(f);input.primary_state=3;input.aiming_actor=f.in.aiming_actor;input.reticle_actor=f.in.reticle_actor;input.reticle_x=f.in.reticle_x;input.reticle_y=f.in.reticle_y;input.native_tongue_observed=input.native_tongue_known=true;const auto out=bridge::controller.step(input);need(out.buttons&d::jump_button,"The real shared risk observation reaches the actual A-only evasion consumer");
+  need(native_x(d::Output{true,0,-1,0},{})==-54,"Native full-counter geometry remains unchanged by this appended jump overlay");
+  ++r::variant_epoch;d::Input stale=f.in;bridge::observe_fish_navigation(ram,player,171,4,f.centers,stale);need(!stale.fish_evade_observed,"A foreign retry epoch cannot create the source-owned risk witness");
+ }
+ std::cout<<"BossFishEvadeControls0260Checks: "<<checks<<" PASS; ordinary-A/second-Z controls and real Bridge observer composition; HOST action/trace boundaries explicit, no native landing or victory claim.\n";return 0;
+}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

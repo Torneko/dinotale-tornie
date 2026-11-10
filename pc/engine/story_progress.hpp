@@ -30,8 +30,8 @@ inline unsigned unlocked(const State& p,uint32_t story){return final_ready(p,sto
 // The native result snapshot precedes egg promotion and the progression save.
 // Preview only their count here: do not draw a color, revive an older loss or
 // write progression before the normal successful-level commit.
-inline unsigned tally_lives(const State& p,uint32_t story,bool trial,unsigned row,unsigned col,unsigned alive,unsigned flags){
-    unsigned mask=alive&0x3FFF;
+inline unsigned tally_lives(const State& p,uint32_t story,bool trial,unsigned row,unsigned col,unsigned alive,unsigned flags,unsigned allowed_mask=0x3FFF){
+    unsigned mask=alive&(allowed_mask==0xFFFF?0xFFFFu:0x3FFFu);
     const bool accepted=valid(p,story);
     if(!trial || (accepted && p.trial==0xFFFFFF))mask|=(flags>>4)&192;
     unsigned count=std::popcount(mask);

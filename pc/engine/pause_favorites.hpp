@@ -1,6 +1,7 @@
 #pragma once
 #include "recomp.h"
 #include "special_content_rules.hpp"
+#include "yoshi_colors0300.hpp"
 #include <array>
 #include <bit>
 
@@ -12,7 +13,7 @@ constexpr List list(unsigned color){
     if(color<6){
         result.frames[result.count++]=classic[color];
         for(unsigned f=0;f<6;f++)if(special::favorite(f,color))result.frames[result.count++]=9+f;
-    }else if(color==6 || color==7){result.count=1;} // Native all-fruits indicator.
+    }else if(color==6 || color==7 || yoshi_colors0300::metal(color)){result.count=1;} // Native all-fruits indicator.
     else if(color<14){
         for(auto base:special::components[color-8])result.frames[result.count++]=classic[base];
         result.frames[result.count++]=9+color-8;

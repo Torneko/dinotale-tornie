@@ -32,6 +32,14 @@ int main(int argc,char** argv) {
         std::vector<uint8_t> overflow(16+150*12);std::copy(workshop::magic.begin(),workshop::magic.end(),overflow.begin());workshop::put32(overflow,8,workshop::u32(file,8));workshop::put32(overflow,12,150);
         size_t spawn=root.offset,other=root.offset;for(unsigned i=0;i<root.count;i++){size_t p=root.offset+i*root.stride;if(workshop::u16(file,p)==0x4001)spawn=p;else other=p;}
         std::copy_n(file.begin()+spawn,12,overflow.begin()+16);for(unsigned i=1;i<150;i++)std::copy_n(file.begin()+other,12,overflow.begin()+16+i*12);reject(overflow);
+        for(const auto& room:workshop::payload_rooms(file))if(room.terrain_count){
+            size_t p=room.terrain_offset;invalid=file;invalid[p]=255;invalid[p+1]=255;reject(invalid);
+            invalid=file;invalid[p+2]=255;invalid[p+3]=255;reject(invalid);
+            invalid=file;invalid[p+4]=127;invalid[p+5]=255;reject(invalid);
+            invalid=file;invalid[p+6]=0xBE;invalid[p+7]=0xEF;reject(invalid);
+            if(room.terrain_count>1){invalid=file;std::copy_n(file.begin()+p,4,invalid.begin()+p+8);reject(invalid);}
+            break;
+        }
         std::ofstream out(argv[3],std::ios::binary);out.write(reinterpret_cast<const char*>(output.data()),output.size());
         workshop::require(bool(out),"Cannot write test output");
         std::cout<<"Native loader: valid project accepted; malformed, over-capacity and moved-entry projects rejected; all code preserved.\n";

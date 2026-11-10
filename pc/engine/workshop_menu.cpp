@@ -1,3 +1,13 @@
+#ifdef WORKSHOP_NATIVE_COOP
+extern "C" int workshop_boss_solo_done();
+extern "C" int workshop_battle_done();
+extern "C" int workshop_battle_prepare();
+extern "C" unsigned workshop_battle_challenges();
+extern "C" int workshop_battle_awarded();
+extern "C" int workshop_battle_challenge_readable();
+extern "C" int workshop_battle_diagnostic();
+extern "C" int workshop_battle_failed();
+#endif
 #include "workshop_menu.hpp"
 
 #include "custom_session.hpp"
@@ -11,12 +21,31 @@
 #include "collections.hpp"
 
 #include "hybrid_mode.hpp"
+#include "game_modes0320.hpp"
+#include "story_hybrid0320.hpp"
+#include "story_rights0320.hpp"
+#include "hybrid_finds.hpp"
+#include "story_hard_bridge0330.hpp"
+#include "story_hard0330.hpp"
+#include "hybrid_completion0290.hpp"
+#include "metal_yoshis0300.hpp"
+#include "heart_shop0283.hpp"
+#include "purchase_audio0284.hpp"
+#include "menu_music_gate0310.hpp"
+#include "menu_music_session0310.hpp"
+#include <chrono>
+#include <random>
 
 #include "linux_process.hpp"
 
 #include "recompui/recompui.h"
 
 #include "recompui/config.h"
+#ifdef WORKSHOP_NATIVE_COOP
+#define WORKSHOP_COOP_HEALTH_RECOMP_UI
+#include "coop_health_hud0250.hpp"
+#endif
+
 
 #include "elements/ui_image.h"
 
@@ -57,6 +86,7 @@ namespace {
 using namespace recompui;
 
 bool enabled=false,french=true;
+bool purchase_sound=true,preferences_saved=true;
 
 std::atomic<int> boot_mode{-1};
 
@@ -80,6 +110,43 @@ bool loading_mode=false;
 
 bool resume_pending=false;
 
+// Explicit ownership survives Options overlays and native paused snapshots
+// that lag one frame behind Resume. Workers never change this ownership.
+bool book_music_owned0310=false;
+bool music_configured0310=false;
+void claim_book_music0310(){
+    if(book_music_owned0310)return;
+    workshop_menu_native_audio_gate0310(true);
+    book_music_owned0310=true;
+}
+void release_book_music0310(){
+    workshop::menu_music_session0310::suspend(); // Stop/clear before native wake.
+    book_music_owned0310=false;
+    workshop_menu_native_audio_gate0310(false);
+}
+void shutdown_book_music0310(){
+    workshop::menu_music_session0310::shutdown();
+    book_music_owned0310=false;
+    workshop_menu_native_audio_gate0310(true); // Exiting: never wake native music.
+}
+void frame_book_music0310(){
+    if(!music_configured0310 && recomp::is_rom_valid(u8"yoshisstory.n64.us")){
+        char* base=SDL_GetBasePath();
+        if(base){
+            auto directory=std::filesystem::u8path(base);SDL_free(base);
+            recomp::GameEntry game{};game.game_id=u8"yoshisstory.n64.us";
+            auto config=recomp::get_config_path();
+            workshop::menu_music_session0310::configure(directory,config/"menu-music0310",config/game.stored_filename());
+            music_configured0310=true;
+        }
+    }
+    // No IO, rendering or joins here. PCM publication and playback only.
+    workshop::menu_music_session0310::frame(book_music_owned0310,
+        ultramodern::is_game_started()&&!book_music_owned0310,
+        recompui::config::sound::get_main_volume());
+}
+
+
 Element* focus_pending=nullptr;
 
 bool focus_waited=false;
@@ -96,9 +163,9 @@ std::array<Label*,4> action_labels{};
 
 std::array<std::function<void()>,4> action_callbacks{};
 
-std::array<Element*,7> choices{};
+std::array<Element*,8> choices{};
 
-std::array<Label*,7> choice_labels{};
+std::array<Label*,8> choice_labels{};
 
 nlohmann::json progress;
 
@@ -110,7 +177,49 @@ constexpr Color ink{73,43,25,255},paper{247,229,198,255},ribbon{245,219,176,255}
 
 const char* tr(const char* fr,const char* en){return french?fr:en;}
 
+bool save_menu_preferences(bool new_french,bool new_sound){
+    const std::filesystem::path file="book-menu.json";
+    auto temporary=file;temporary+=".tmp-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    try{
+        auto value=nlohmann::json::object();
+        if(std::filesystem::exists(file)){
+            if(std::filesystem::file_size(file)>65536)throw std::runtime_error("preferences-size");
+            std::ifstream source(file);source>>value;
+            if(!value.is_object())throw std::runtime_error("preferences-shape");
+        }
+        value["version"]=1;value["language"]=new_french?"fr":"en";value["purchaseSound"]=new_sound;
+        {std::ofstream stream(temporary,std::ios::binary|std::ios::trunc);stream<<value.dump(2)<<'\n';stream.flush();if(!stream)throw std::runtime_error("preferences-write");}
+#ifdef _WIN32
+        if(!MoveFileExW(temporary.c_str(),file.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))throw std::runtime_error("preferences-replace");
+#else
+        std::filesystem::rename(temporary,file);
+#endif
+        preferences_saved=true;return true;
+    }catch(const std::exception& error){
+        std::error_code ignored;std::filesystem::remove(temporary,ignored);
+        preferences_saved=false;fprintf(stderr,"[BookPreferences] save failed: %s\n",error.what());return false;
+    }
+}
+void purchase_feedback(){if(purchase_sound)(void)workshop_purchase_sound0284();}
+
+
+nlohmann::json story_progress0320=nlohmann::json::object();
+nlohmann::json hard_progress0330=nlohmann::json::object();
+void refresh_canonical_progress0320(){
+    const auto rights=workshop::story_rights0320::read(recomp::get_config_path()/"saves"/"yoshisstory.n64.us.bin");
+    if(!rights.present||!rights.readable){progress={{"valid",false}};return;}
+    const auto finds=workshop::finds::view();
+    const unsigned owned=finds.initialized&&finds.readable&&finds.migrated?finds.found:rights.legacy_owned;
+    progress={{"valid",true},{"storyMask",rights.story},{"trialMask",rights.trial},{"extraYoshiMask",owned}};
+}
+void write_progress_summary0320(){
+    const int selected=session_mode.load();
+    const bool hybrid=selected==workshop::game_modes0320::StoryHybrid,hard=selected==workshop::game_modes0320::StoryHard;
+    const char* name=hard?(workshop::story_hard_bridge0330::preview()?"menu-progress-story-hard-preview.json":"menu-progress-story-hard.json"):hybrid?"menu-progress-story-hybrid.json":"menu-progress.json";
+    std::ofstream summary(name);summary<<(hard?hard_progress0330:hybrid?story_progress0320:progress).dump(2)<<'\n';
+}
 void home();
+void story_hard_page0330();
 
 void open_book();
 
@@ -250,11 +359,11 @@ void rect(Element* element,float left,float top,float width,float height){
 
 void update_titles(){
 
-    const char* fr[]={"Story","Trial","Création","Statistiques et succès","Mode hybride","Options","Practice"};
+    const char* fr[]={"Story","Trial","Création","Statistiques et succès","Mode hybride","Options","Practice","Boss Battle"};
 
-    const char* en[]={"Story","Trial","Creation","Statistics & achievements","Hybrid mode","Options","Practice"};
+    const char* en[]={"Story","Trial","Creation","Statistics & achievements","Hybrid mode","Options","Practice","Boss Battle"};
 
-    for(unsigned i=0;i<7;i++)choice_labels[i]->set_text(french?fr[i]:en[i]);
+    for(unsigned i=0;i<choices.size();i++)choice_labels[i]->set_text(french?fr[i]:en[i]);
 
     if(progress.is_object() && progress.value("valid",false) && progress.value("trialMask",0u)!=0xFFFFFF){
 
@@ -280,7 +389,7 @@ void home(){
 
     menu_context.set_autofocus_element(choices[0]);
 
-    fprintf(stderr,"[BookMenu] page=home entries=7 language=%s\n",french?"fr":"en");
+    fprintf(stderr,"[BookMenu] page=home entries=8 language=%s\n",french?"fr":"en");
 
 }
 
@@ -336,6 +445,8 @@ void open_book(){
 
     }
 
+    claim_book_music0310();
+
     auto previous=recompui::try_close_current_context();
 
     menu_context.open();home();
@@ -386,9 +497,9 @@ void route_native(int mode){
 
         if(GetModuleFileNameW(nullptr,executable.data(),DWORD(executable.size()))){
 
-            {std::ofstream summary("menu-progress.json");summary<<progress.dump(2)<<'\n';}
+            write_progress_summary0320();
 
-            std::wstring command=L"\""+std::wstring(executable.data())+L"\" --workshop-wait-parent "+std::to_wstring(GetCurrentProcessId())+L" --workshop-main-menu --workshop-start-mode "+std::to_wstring(mode);
+            std::wstring command=L"\""+std::wstring(executable.data())+L"\" --workshop-wait-parent "+std::to_wstring(GetCurrentProcessId())+L" --workshop-main-menu"+(mode>=0?L" --workshop-start-mode "+std::to_wstring(mode):L"");
 
             STARTUPINFOW startup{};startup.cb=sizeof(startup);
 
@@ -400,6 +511,7 @@ void route_native(int mode){
 
                 CloseHandle(process.hThread);CloseHandle(process.hProcess);
 
+                shutdown_book_music0310();
                 ultramodern::quit();return;
 
             }
@@ -426,14 +538,15 @@ void route_native(int mode){
 
         }
 
-        {std::ofstream summary("menu-progress.json");summary<<progress.dump(2)<<'\n';}
+        write_progress_summary0320();
 
-        if(workshop::linux_process::launch(workshop::linux_process::executable(),
-
-            {"--workshop-wait-parent",std::to_string(workshop::linux_process::id()),"--workshop-main-menu","--workshop-start-mode",std::to_string(mode)},std::filesystem::current_path())){
+        std::vector<std::string> next_args{"--workshop-wait-parent",std::to_string(workshop::linux_process::id()),"--workshop-main-menu"};
+        if(mode>=0){next_args.push_back("--workshop-start-mode");next_args.push_back(std::to_string(mode));}
+        if(workshop::linux_process::launch(workshop::linux_process::executable(),next_args,std::filesystem::current_path())){
 
             fprintf(stderr,"[BookLink] Linux handoff mode=%d parent=%u save-barrier=complete\n",mode,workshop::linux_process::id());fflush(stderr);
 
+            shutdown_book_music0310();
             ultramodern::quit();return;
 
         }
@@ -461,6 +574,7 @@ void close_custom_runtime(bool advance){
     if(workshop::custom_session::ready() && !workshop::custom_session::close(advance))return;
     if(window){int x,y,w,h;SDL_GetWindowPosition(window,&x,&y);SDL_GetWindowSize(window,&w,&h);std::ofstream file("book-window.json");file<<nlohmann::json{{"x",x},{"y",y},{"width",w},{"height",h},{"maximized",bool(SDL_GetWindowFlags(window)&SDL_WINDOW_MAXIMIZED)}}.dump(2);file.flush();}
     fprintf(stderr,"[CustomSession] checkpoint-close save-barrier=complete result=%d advance=%d\n",int(workshop::custom_session::ready()),int(advance));std::fflush(nullptr);
+    shutdown_book_music0310();
     std::_Exit(0);
 }
 void launch_native(int mode){
@@ -473,6 +587,21 @@ void launch_native(int mode){
 
     }
 
+    if(!workshop::game_modes0320::valid(mode))return;
+    if(mode==workshop::game_modes0320::StoryHard){
+        const auto rights=workshop::story_hard_bridge0330::access();
+        const auto local=workshop::story_hard0330::view();
+        if((!workshop::story_hard_bridge0330::preview()&&!workshop::story_hard_access0330::entitled(rights))||!local.readable||!local.saved){story_hard_page0330();return;}
+    }
+    if(mode==workshop::game_modes0320::StoryHybrid){
+        // The base EEPROM is the authority for Trial completion. A fresh
+        // alternate Story save is deliberately not a source of shared rights.
+        refresh_canonical_progress0320();
+        const auto local=workshop::story_hybrid0320::view();
+        if(!progress.value("valid",false)||progress.value("trialMask",0u)!=0xFFFFFF||!workshop::collections::view().readable||!workshop::collections::view().state.owns(workshop::collections::Item::Hybrid)||!local.readable||!local.saved||!workshop::finds::view().readable||!workshop::finds::view().saved||!workshop::metal_yoshis0300::view().readable||!workshop::metal_yoshis0300::view().saved){
+            panel(tr("Story hybride verrouillé","Hybrid Story locked"),tr("Le mode hybride doit être acheté et les 24 Trial classiques terminés. Sa progression doit aussi être lisible.","Purchase Hybrid mode and clear all 24 classic Trial levels. Its progress must also be readable."));back();return;
+        }
+    }
     if(mode==3 && (!workshop::hybrid_mode::readable() || !workshop::hybrid_mode::entitled(progress.value("trialMask",0u),workshop::collections::view().state.owns(workshop::collections::Item::Hybrid)))){
 
         panel(tr("Mode hybride verrouillé","Hybrid mode locked"),tr("Il faut acheter ce mode et terminer les 24 Trial. Vérifie aussi que son fichier de records est lisible.","Purchase this mode and clear all 24 Trial levels. Its records file must also be readable."));back();return;
@@ -495,18 +624,27 @@ void launch_native(int mode){
 
     }
 
+#ifdef WORKSHOP_NATIVE_COOP
+    if(mode==4&&!workshop_battle_prepare()){
+        panel(tr("Bataille indisponible","Battle unavailable"),tr("Ce profil utilise déjà une autre session spéciale.","This profile already uses another special session."));back();return;
+    }
+#endif
     boot_mode.store(mode);
 
     session_mode.store(mode);
 
-    workshop::hybrid_mode::activate(mode==3);
+    workshop::hybrid_mode::activate(workshop::game_modes0320::hybrid_content(mode),workshop::game_modes0320::hybrid_trial_records(mode));
+    if(mode!=5)workshop::story_hybrid0320::deactivate();
 
     workshop::achievements::start_session(unsigned(mode));
+    workshop::hybrid_completion0290::start_session(unsigned(mode));
+    workshop::metal_yoshis0300::start_session(unsigned(mode),mode!=4);
 
     workshop::collections::start_session(unsigned(mode));
 
-    fprintf(stderr,"[BookMenu] launch=%s\n",mode==0?"story":mode==1?"trial":mode==3?"hybrid":"practice");fflush(stderr);
+    fprintf(stderr,"[BookMenu] launch=%s\n",mode==0?"story":mode==5?"story-hybrid":mode==6?"story-hard":mode==1?"trial":mode==3?"hybrid":mode==4?"boss-battle":"practice");fflush(stderr);
 
+    release_book_music0310();
     recomp::start_game(u8"yoshisstory.n64.us",{});recompui::hide_all_contexts();
 
 }
@@ -523,7 +661,13 @@ bool launch_workshop(bool games){
 
 #else
 
-    auto executable=pc_root/"build/workshop-0.15.0/YoshiStory-AtelierPC.exe";
+    auto executable=pc_root/"build/workshop-0.21.0/YoshiStory-AtelierPC.exe";
+    if(!std::filesystem::exists(executable))executable=pc_root/"build/workshop-0.20.0/YoshiStory-AtelierPC.exe";
+    if(!std::filesystem::exists(executable))executable=pc_root/"build/workshop-0.19.0/YoshiStory-AtelierPC.exe";
+    if(!std::filesystem::exists(executable))executable=pc_root/"build/workshop-0.18.0/YoshiStory-AtelierPC.exe";
+    if(!std::filesystem::exists(executable))executable=pc_root/"build/workshop-0.17.0/YoshiStory-AtelierPC.exe";
+    if(!std::filesystem::exists(executable))executable=pc_root/"build/workshop-0.16.0/YoshiStory-AtelierPC.exe";
+    if(!std::filesystem::exists(executable))executable=pc_root/"build/workshop-0.15.0/YoshiStory-AtelierPC.exe";
     if(!std::filesystem::exists(executable))executable=pc_root/"build/workshop-0.14.0/YoshiStory-AtelierPC.exe";
     if(!std::filesystem::exists(executable))executable=pc_root/"build/workshop-0.13.0/YoshiStory-AtelierPC.exe";
     if(!std::filesystem::exists(executable))executable=pc_root/"build/workshop-0.8.0/YoshiStory-AtelierPC.exe";
@@ -576,7 +720,58 @@ void creation(){
 
 }
 
+void boss_battle(){
+    std::string challenge_text;
+#ifdef WORKSHOP_NATIVE_COOP
+    const auto mask=workshop_battle_challenges();challenge_text=tr("Défis remportés : ","Challenges won: ")+std::to_string(std::popcount(mask))+" / 14\n\n";
+    if(!workshop_battle_challenge_readable())challenge_text+=tr("Le fichier des défis est illisible. Il est conservé ; les nouveaux résultats ne peuvent pas être enregistrés.\n\n","The challenge file cannot be read. It has been preserved; new results cannot be saved.\n\n");
+    for(unsigned color=0;color<14;++color){const auto& id=workshop::coop_health0250::identities[color];challenge_text+=(mask&(1u<<color))?"[x] ":"[ ] ";challenge_text+=french?id.french:id.english;challenge_text+=color%2?"\n":" | ";}
+#endif
+    panel("Boss Battle",tr("Dix combats, un Yoshi. Les prochains boss restent cachés.\n\nAu repos : Lucky Tree, bloc d’œufs et pot vers le combat suivant. L’arbre garde les fruits consommés et dispose de deux régénérations par session.\n\nAprès les boss 3, 6 et 9, réveille le personnage numéroté : après une défaite, le même Yoshi reprend avec la vie et les œufs enregistrés. Un grand cœur à usage unique apparaît après le cinquième boss.","Ten battles, one Yoshi. Upcoming bosses stay hidden.\n\nAt each rest stop: Lucky Tree, egg block and pot to the next fight. The tree remembers consumed fruit and has two regenerations per session.\n\nAfter bosses 3, 6 and 9, wake the numbered character: after a defeat, the same Yoshi returns with the saved health and eggs. A one-use big heart appears after the fifth boss."));
+#ifdef WORKSHOP_NATIVE_COOP
+    action(0,tr("Commencer la bataille","Start battle"),[]{launch_native(4);});
+#else
+    action(0,tr("Mode indisponible dans cette version","Mode unavailable in this build"),[]{panel("Boss Battle",tr("Cette version ne contient pas les combats natifs.","This build does not include native boss encounters."));back();});
+#endif
+    action(1,tr("Défis par Yoshi","Yoshi challenges"),[challenge_text]{panel(tr("Les 14 défis","The 14 challenges"),challenge_text);action(0,tr("Retour","Back"),boss_battle);});back(2);
+}
+
 void statistics();
+void heart_shop(const std::string& notice={});
+
+void buy_heart_bonus(workshop::heart_wallet0283::Bonus bonus){
+    namespace h=workshop::heart_wallet0283;
+    uint64_t seed=uint64_t(std::chrono::steady_clock::now().time_since_epoch().count());
+    try{std::random_device random;seed^=(uint64_t(random())<<32)^random();}catch(...){}
+    const auto result=workshop::heart_shop0283::wallet().purchase(bonus,seed);
+    std::string message;
+    if(result.committed()){purchase_feedback();message=tr("Achat enregistré. Le bonus attend la prochaine tentative.","Purchase saved. The bonus is queued for the next attempt.");}
+    else if(result.status==h::Status::AlreadyPending)message=tr("Ce bonus est déjà en attente.","This bonus is already queued.");
+    else if(result.status==h::Status::InsufficientFunds)message=tr("Solde insuffisant. Aucun cœur dépensé.","Insufficient balance. No hearts spent.");
+    else message=tr("Achat non enregistré. Aucun cœur dépensé.","Purchase not saved. No hearts spent.");
+    heart_shop(message);
+}
+
+void heart_shop(const std::string& notice){
+    namespace h=workshop::heart_wallet0283;
+    const auto view=workshop::heart_shop0283::wallet().snapshot();
+    std::string text=tr("Cœurs disponibles : ","Available hearts: ")+std::to_string(view.value.balance())+" / 72\n\n";
+    text+=tr("Les trois cœurs rouges de chaque niveau Trial rapportent chacun un cœur de monnaie. Ils restent présents et soignent normalement en rejouant. Un cœur déjà compté ne rapporte pas de monnaie supplémentaire.","Each of the three red hearts per Trial level awards one currency heart. They remain present and heal normally on replay. An already counted heart awards no additional currency.");
+    text+=tr("\n\nChaque achat rend le même nombre de cœurs déjà comptés, choisis au hasard, de nouveau disponibles à la collecte.","\n\nEach purchase makes the same number of randomly chosen, already counted hearts available to earn again.");
+    text+=tr("\n\nBonus pour la prochaine tentative en Story, Trial, Hybride ou Boss Battle :\n5 cœurs : commencer avec 8 PV, sans augmenter le maximum.\n3 cœurs : commencer avec 6 œufs.","\n\nBonuses for the next attempt in Story, Trial, Hybrid or Boss Battle:\n5 hearts: start with 8 HP, without raising the maximum.\n3 hearts: start with 6 eggs.");
+    if(view.value.pending.life)text+=tr("\n\nVie de départ : bonus en attente.","\n\nStarting health: bonus queued.");
+    if(view.value.pending.eggs)text+=tr("\nŒufs de départ : bonus en attente.","\nStarting eggs: bonus queued.");
+    if(!view.readable)text+=tr("\n\nFichier de cœurs indisponible : les achats et la collecte de monnaie sont désactivés. La sauvegarde est conservée.","\n\nHeart file unavailable: purchases and currency collection are disabled. The save is preserved.");
+    else if(!view.last_write_succeeded)text+=tr("\n\nLe dernier enregistrement n’a pas abouti.","\n\nThe latest save did not succeed.");
+    if(!workshop::heart_shop0283::runtime_available)text+=tr("\n\nLes bonus ne sont pas disponibles dans cette compilation.","\n\nBonuses are unavailable in this build.");
+    if(!notice.empty())text+="\n\n"+notice;
+    panel(tr("Boutique des cœurs","Heart shop"),text);
+    if(workshop::heart_shop0283::runtime_available && view.readable && !view.value.pending.life && view.value.balance()>=h::life_cost)
+        action(0,tr("Vie de départ · 5 cœurs","Starting health · 5 hearts"),[]{buy_heart_bonus(h::Bonus::Life);});
+    if(workshop::heart_shop0283::runtime_available && view.readable && !view.value.pending.eggs && view.value.balance()>=h::eggs_cost)
+        action(1,tr("6 œufs · 3 cœurs","6 eggs · 3 hearts"),[]{buy_heart_bonus(h::Bonus::Eggs);});
+    action(3,tr("Retour aux statistiques","Back to statistics"),statistics);
+}
 
 void buy_upgrade(workshop::collections::Item item){
 
@@ -602,7 +797,7 @@ void buy_upgrade(workshop::collections::Item item){
 
     if(allowed)action(0,tr("Acheter · ","Buy · ")+std::to_string(price)+tr(" pièces"," coins"),[item]{
 
-        if(purchase(item))buy_upgrade(item);
+        if(purchase(item)){purchase_feedback();buy_upgrade(item);}
 
         else{panel(tr("Achat non enregistré","Purchase not saved"),tr("Aucune pièce n’a été dépensée.","No coins were spent."));action(0,tr("Retour à la boutique","Back to shop"),collection_page);}
 
@@ -654,7 +849,7 @@ void buy_egg(workshop::collections::Item item){
 
             action(0,tr("Retour à la boutique","Back to shop"),collection_page);
 
-        }else buy_egg(item);
+        }else{purchase_feedback();buy_egg(item);}
 
     });
 
@@ -745,12 +940,28 @@ void statistics(){
     }
 
     const unsigned story=progress.value("storyMask",0u),trial=progress.value("trialMask",0u),extras=progress.value("extraYoshiMask",0u);
+    const auto hybrid_progress=workshop::hybrid_completion0290::view();
+    const auto story_hybrid=workshop::story_hybrid0320::view();
+    const auto hard=workshop::story_hard0330::view();
 
     std::string text=tr("Niveaux terminés en Story : ","Story levels cleared: ")+std::to_string(std::popcount(story))+" / 24\n";
 
     text+=tr("Niveaux terminés en Trial : ","Trial levels cleared: ")+std::to_string(std::popcount(trial))+" / 24\n";
+    if(hybrid_progress.readable)text+=tr("Niveaux terminés en Trial hybride : ","Hybrid Trial levels cleared: ")+std::to_string(hybrid_progress.count)+" / 24\n";
+    else text+=tr("Suivi du Trial hybride illisible, conservé.\n","Unreadable Hybrid Trial progress preserved.\n");
 
+    if(story_hybrid.present&&story_hybrid.readable)text+=tr("Mondes terminés en Story hybride : ","Hybrid Story worlds cleared: ")+std::to_string(story_hybrid.count)+" / 6\n";
+    if(hard.present&&hard.readable&&hard.scope==workshop::story_hard0330::Scope::Production)text+=tr("Réussites Story difficile : ","Hard Story runs cleared: ")+std::to_string(hard.runs_won)+tr(" · Yoshis : "," · Yoshis: ")+std::to_string(std::popcount(hard.completed))+" / 16\n";
     text+=tr("Yoshis hybrides débloqués : ","Hybrid Yoshis unlocked: ")+std::to_string(std::popcount(extras))+" / 6\n\n";
+
+    const auto metals=workshop::metal_yoshis0300::view();
+    if(metals.readable){
+        text+=tr("Yoshis or et argent trouvés : ","Gold and Silver Yoshis found: ")+std::to_string(std::popcount(metals.found))+" / 2\n";
+        text+=tr("Or : ","Gold: ");text+=(metals.found&1?tr("trouvé","found"):tr("à trouver","not found"));
+        text+=tr(" · Argent : "," · Silver: ");text+=(metals.found&2?tr("trouvé","found"):tr("à trouver","not found"));
+        text+=tr("\nLes 24 Trial hybrides terminés permettent de chercher leurs œufs aux emplacements du Maskass blanc, un à la fois.\n\n","\nClear all 24 Hybrid Trial levels to search for their eggs at White Shy Guy locations, one at a time.\n\n");
+        if(!metals.saved)text+=tr("Dernier résultat or/argent non enregistré.\n","Latest Gold/Silver result not saved.\n");
+    }else text+=tr("Suivi or/argent illisible, conservé.\n\n","Unreadable Gold/Silver progress preserved.\n\n");
 
     for(unsigned page=0;page<6;page++){
 
@@ -760,7 +971,7 @@ void statistics(){
 
             unsigned bit=1u<<(page*4+level);text+=std::to_string(level+1)+"[";
 
-            text+=(story&bit)?"S":"-";text+=(trial&bit)?"T":"-";text+="]  ";
+            text+=(story&bit)?"S":"-";text+=(trial&bit)?"T":"-";text+=hybrid_progress.readable?((hybrid_progress.mask&bit)?"H":"-"):"?";text+="]  ";
 
         }
 
@@ -772,7 +983,7 @@ void statistics(){
 
     for(const auto& level:ledger.levels){full+=level.fullHealth;same+=std::popcount(level.sameFruit);hearts+=level.allHearts;}
 
-    text+=tr("\nS = Story, T = Trial\n\nPleine santé : ","\nS = Story, T = Trial\n\nFull health: ")+std::to_string(full)+" / 24\n";
+    text+=tr("\nS = Story, T = Trial, H = Hybride\n\nPleine santé : ","\nS = Story, T = Trial, H = Hybrid\n\nFull health: ")+std::to_string(full)+" / 24\n";
 
     text+=tr("Défis 30 fruits identiques : ","30 identical fruit challenges: ")+std::to_string(same)+" / 264\n";
 
@@ -784,11 +995,15 @@ void statistics(){
 
     else if(!ledger.saved)text+=tr("\nDernier résultat non enregistré.","\nLatest result not saved.");
 
+    if(hybrid_progress.readable && !hybrid_progress.saved)text+=tr("\nProgression hybride non enregistrée.","\nHybrid progress not saved.");
+    if(!hybrid_progress.legacy_readable)text+=tr("\nAnciens records hybrides illisibles : import différé, fichier conservé.","\nPrevious hybrid records unreadable: import deferred, file preserved.");
+
     panel(tr("Statistiques et succès","Statistics & achievements"),text);
 
     action(0,tr("Succès par niveau","Achievements by level"),[]{achievement_details(0);});
 
     action(1,tr("Collection et boutique","Collection & shop"),collection_page);back(2);
+    action(3,tr("Boutique des cœurs","Heart shop"),[]{heart_shop();});
 
 }
 
@@ -808,6 +1023,14 @@ void hybrid(){
 
     if(!workshop::hybrid_mode::readable())body+=tr("\nFichier de records illisible conservé ; mode indisponible.","\nUnreadable records file preserved; mode unavailable.");
 
+    const auto hybrid_progress=workshop::hybrid_completion0290::view();
+    if(hybrid_progress.readable)body+=tr("\n\nNiveaux terminés en Trial hybride : ","\n\nHybrid Trial levels cleared: ")+std::to_string(hybrid_progress.count)+" / 24";
+    else body+=tr("\n\nSuivi des réussites hybrides illisible, conservé.","\n\nUnreadable hybrid completion progress preserved.");
+    if(hybrid_progress.readable && !hybrid_progress.saved)body+=tr("\nDernière progression hybride non enregistrée.","\nLatest hybrid progress not saved.");
+    if(!hybrid_progress.legacy_readable)body+=tr("\nImport des anciens records hybrides différé ; fichier conservé.","\nPrevious hybrid record import deferred; file preserved.");
+
+    body+=tr("\n\nAprès les 24 réussites hybrides, deux nouveaux œufs permettent de trouver les Yoshis or et argent. Leurs fruits hybrides donnent 3 points et 3 de vie ; les fruits classiques donnent 2 et 2.","\n\nAfter all 24 Hybrid clears, find two new eggs to recruit Gold and Silver Yoshis. Hybrid fruits give them 3 points and 3 health; classic fruits give 2 of each.");
+
     panel(tr("Mode hybride","Hybrid mode"),body);
 
     if(complete && bought && workshop::hybrid_mode::readable())action(0,tr("Jouer au mode hybride","Play Hybrid mode"),[]{launch_native(3);});
@@ -818,23 +1041,59 @@ void hybrid(){
 
 }
 
+void story_modes0320(){
+    const auto local=workshop::story_hybrid0320::view();
+    std::string text=tr("Le Story classique conserve sa partie et ses records. Le Story hybride possède sa propre partie et ses records.\n\nDans le Story hybride, un nouvel œuf hybride devient trouvable après chaque monde terminé. Les Yoshis déjà obtenus et les achats sont conservés. Les fruits et les Maskass suivent les règles du mode hybride.","Classic Story keeps its own run and records. Hybrid Story has a separate run and records.\n\nIn Hybrid Story, one new hybrid egg becomes searchable after each world cleared. Previously acquired Yoshis and purchases are shared. Fruit and Shy Guys use Hybrid mode rules.");
+    if(local.present&&local.readable)text+=tr("\n\nMondes terminés en Story hybride : ","\n\nHybrid Story worlds cleared: ")+std::to_string(local.count)+" / 6";
+    if(!local.readable||!local.saved)text+=tr("\nProgression hybride illisible ou non enregistrée, conservée.","\nUnreadable or unsaved Hybrid Story progress preserved.");
+    text+=tr("\n\nAccès hybride : mode acheté et 24 Trial classiques terminés.","\n\nHybrid access: purchased mode and 24 classic Trial clears.");
+    panel(tr("Story","Story"),text);
+    action(0,tr("Story classique","Classic Story"),[]{launch_native(0);});
+    action(1,tr("Story hybride","Hybrid Story"),[]{launch_native(5);});
+    action(2,tr("Story difficile","Hard Story"),story_hard_page0330);back(3);
+}
+void story_hard_page0330(){
+    const auto rights=workshop::story_hard_bridge0330::access();const auto local=workshop::story_hard0330::view();
+    const bool preview=workshop::story_hard_bridge0330::preview();
+    std::string text=tr("Commence avec le Yoshi vert seul. Un œuf aléatoire apparaît près du point 4 de chaque niveau ; dans le 5-3, il se trouve près de l’entrée de la dernière salle. Les Yoshis recrutés puis gardés en vie jusqu’à Bowser valident leur réussite au terme des six niveaux.\n\nLes réussites de chaque Yoshi se cumulent entre les parties. Un Yoshi perdu puis secouru ne valide pas cette fois-ci. Cette partie et ses records sont séparés des autres Story.\n\n","Start with Green Yoshi alone. Each level has one random egg near checkpoint 4; in 5-3 it is near the final room entrance. Yoshis recruited and kept alive through Bowser earn their clear after all six levels.\n\nEach Yoshi’s clears accumulate across runs. A lost and rescued Yoshi does not earn this run’s clear. The run and its records are separate from other Story modes.\n\n");
+    if(preview)text+=tr("Aperçu de test séparé : aucun succès ni déblocage permanent n’est attribué.\n\n","Separate test preview: no permanent achievement or unlock is awarded.\n\n");
+    else{
+        text+=tr("Condition : trouver les 16 Yoshis et remporter le Boss Battle avec chacun.\nYoshis trouvés : ","Requirement: find all 16 Yoshis and win Boss Battle with each one.\nYoshis found: ")+std::to_string(std::popcount(rights.owned16))+" / 16\n";
+        text+=tr("Défis Boss Battle validés : ","Boss Battle challenges cleared: ")+std::to_string(std::popcount(rights.bossWins16))+" / 16\n\n";
+    }
+    if(local.present&&local.readable){
+        text+=tr("Parties réussies : ","Successful runs: ")+std::to_string(local.runs_won)+"\n";
+        text+=tr("Yoshis ayant réussi : ","Yoshis with a clear: ")+std::to_string(std::popcount(local.completed))+" / 16\n";
+    }
+    const bool play=(preview||workshop::story_hard_access0330::entitled(rights))&&local.readable&&local.saved;
+    if(!play)text+=tr("\nMode verrouillé jusqu’à validation de toutes les conditions. Les sauvegardes sont conservées.","\nLocked until all requirements are met. Existing saves are preserved.");
+    panel(tr("Story difficile","Hard Story"),text);
+    if(play)action(0,preview?tr("Jouer à l’aperçu","Play preview"):tr("Jouer au Story difficile","Play Hard Story"),[]{launch_native(6);});
+    action(1,tr("Retour aux modes Story","Back to Story modes"),story_modes0320);back(2);
+}
 void options(){
 
-    panel(tr("Options","Options"),tr("Langue de ce menu : Français\n\nLes textes du jeu d’origine restent en anglais pour le moment. Le volume, les manettes et l’affichage se règlent dans les paramètres du jeu.","Menu language: English\n\nThe original game remains in English for now. Volume, controllers and display can be adjusted in game settings."));
+    std::string description=tr("Langue de ce menu : Français\n\nLes textes du jeu d’origine restent en anglais pour le moment. Le volume, les manettes et l’affichage se règlent dans les paramètres du jeu.","Menu language: English\n\nThe original game remains in English for now. Volume, controllers and display can be adjusted in game settings.");
+    if(!preferences_saved)description+=tr("\n\nLe réglage n’a pas pu être enregistré. Le fichier existant est conservé.","\n\nThe setting could not be saved. The existing file is preserved.");
+    panel(tr("Options","Options"),description);
 
     action(0,french?"Menu language: English":"Langue du menu : Français",[]{
 
-        french=!french;std::ofstream file("book-menu.json");file<<nlohmann::json{{"version",1},{"language",french?"fr":"en"}}.dump(2)<<'\n';update_titles();options();
+        if(save_menu_preferences(!french,purchase_sound))french=!french;update_titles();options();
 
     });
 
     action(1,tr("Réglages du jeu","Game settings"),[]{recompui::config::open();});back(2);
+    action(3,purchase_sound?tr("Son des achats : activé","Purchase sounds: on"):tr("Son des achats : désactivé","Purchase sounds: off"),[]{
+        if(save_menu_preferences(french,!purchase_sound))purchase_sound=!purchase_sound;
+        options();
+    });
 
 }
 
 void choose(unsigned item){
 
-    switch(item){case 0:launch_native(0);break;case 1:launch_native(1);break;case 2:creation();break;case 3:statistics();break;case 4:hybrid();break;case 5:options();break;case 6:launch_native(2);break;}
+    switch(item){case 0:story_modes0320();break;case 1:launch_native(1);break;case 2:creation();break;case 3:statistics();break;case 4:hybrid();break;case 5:options();break;case 6:launch_native(2);break;case 7:boss_battle();break;}
 
 }
 
@@ -861,16 +1120,29 @@ void create(LauncherMenu* menu){
     recompui::queue_image_from_bytes_file("?/workshop/book-approved",art_bytes);
 
     auto art=menu_context.create_element<Image>(book,"?/workshop/book-approved");rect(art,0,0,100,100);art->set_pointer_events(PointerEvents::None);
+    // The corrected reference approves only the right-hand illustration.
+    // Keep the original full backdrop and clip the unmodified new PNG to its
+    // right half; the live left-hand menu and original title stay intact.
+    std::ifstream right_file("assets/workshop-menu/book-right-approved.png",std::ios::binary);
+    std::vector<char> right_bytes((std::istreambuf_iterator<char>(right_file)),{});
+    if(!right_bytes.empty()){
+        recompui::queue_image_from_bytes_file("?/workshop/book-right-approved",right_bytes);
+        auto right_clip=menu_context.create_element<Element>(book);rect(right_clip,50,0,50,100);
+        right_clip->set_overflow(Overflow::Hidden);right_clip->set_pointer_events(PointerEvents::None);
+        auto right_art=menu_context.create_element<Image>(right_clip,"?/workshop/book-right-approved");
+        rect(right_art,-100,0,200,100);right_art->set_pointer_events(PointerEvents::None);
+    }else fprintf(stderr,"[BookMenu] corrected right illustration missing; original artwork retained.\n");
+
 
     auto cover=menu_context.create_element<Element>(book);rect(cover,4,31.5,45,60.7);cover->set_background_color(paper);cover->set_border_radius(30);cover->set_border_width(3);cover->set_border_color(Color{230,202,160,255});
 
     main_page=menu_context.create_element<Element>(book);rect(main_page,0,0,100,100);main_page->set_as_navigation_container(NavigationType::Vertical);main_page->set_nav_wrapping(true);
 
-    for(unsigned i=0;i<7;i++){
+    for(unsigned i=0;i<choices.size();i++){
 
         choices[i]=menu_context.create_element<BookButton>(main_page,&choice_labels[i],[i]{choose(i);});
 
-        rect(choices[i],6.8,33.1+i*8.15,39.4,6.7);
+        rect(choices[i],6.8,33.1+i*7.15,39.4,6.0);
 
     }
 
@@ -898,9 +1170,10 @@ void create(LauncherMenu* menu){
 
     menu_context.set_autofocus_element(choices[0]);
 
-    std::ifstream summary("menu-progress.json");if(summary)try{summary>>progress;}catch(...){progress=nlohmann::json::object();}else progress=nlohmann::json::object();
+    refresh_canonical_progress0320();
 
     home();
+    if(!ultramodern::is_game_started())claim_book_music0310();
 
     // Non-keyboard-capturing access to the same book from Story, mode menus
 
@@ -960,7 +1233,7 @@ void diagnostic_shop(){
 
             if(!detail_page->remove_child(probe))throw std::runtime_error("Lifetime fixture could not detach its button");
 
-            if(session_menu_button){fprintf(stderr,"[BookShopTest] FAILED destroyed session button retained\n");std::fflush(nullptr);std::_Exit(24);}
+            if(session_menu_button){fprintf(stderr,"[BookShopTest] FAILED destroyed session button retained\n");std::fflush(nullptr);shutdown_book_music0310();std::_Exit(24);}
 
         }
 
@@ -986,7 +1259,7 @@ void diagnostic_shop(){
 
             if(!first || menu_context.get_focused_element()!=first){
 
-                fprintf(stderr,"[BookShopTest] FAILED first-visible focus phase=%u\n",phase);std::fflush(nullptr);std::_Exit(21);
+                fprintf(stderr,"[BookShopTest] FAILED first-visible focus phase=%u\n",phase);std::fflush(nullptr);shutdown_book_music0310();std::_Exit(21);
 
             }
 
@@ -1014,11 +1287,11 @@ void diagnostic_shop(){
 
         key(Rml::Input::KI_DOWN);
 
-        if(menu_context.get_focused_element()!=actions[0]){fprintf(stderr,"[BookShopTest] FAILED stale focus recovery\n");std::fflush(nullptr);std::_Exit(22);}
+        if(menu_context.get_focused_element()!=actions[0]){fprintf(stderr,"[BookShopTest] FAILED stale focus recovery\n");std::fflush(nullptr);shutdown_book_music0310();std::_Exit(22);}
 
         key(Rml::Input::KI_DOWN);
 
-        if(menu_context.get_focused_element()!=actions[1]){fprintf(stderr,"[BookShopTest] FAILED navigation after recovery\n");std::fflush(nullptr);std::_Exit(23);}
+        if(menu_context.get_focused_element()!=actions[1]){fprintf(stderr,"[BookShopTest] FAILED navigation after recovery\n");std::fflush(nullptr);shutdown_book_music0310();std::_Exit(23);}
 
         fprintf(stderr,"[BookShopTest] stale focus recovered; next Down reached second shop button.\n");break;
 
@@ -1070,13 +1343,26 @@ void diagnostic_shop(){
 
         fprintf(stderr,"[BookShopTest] passed 78 native click/key steps; isolated test complete.\n");
 
-        std::fflush(nullptr);std::_Exit(0);
+        std::fflush(nullptr);shutdown_book_music0310();std::_Exit(0);
 
     }
 
 }
 
 #endif
+
+void resolve_deferred_focus(){
+    // Rml applies display changes after this callback. Resolve focus after all
+    // ui_frame paths and wait one update before focusing the newly shown page.
+    if(menu_context==ContextId::null() || !focus_pending ||
+       !recompui::is_context_shown(menu_context) ||
+       recompui::config::get_config_modal()->is_open_now())return;
+    auto previous=recompui::try_close_current_context();
+    menu_context.open();
+    if(focus_waited && focus_pending->is_focusable()==Element::CanFocus::Yes && focus_pending->focus())focus_pending=nullptr;
+    else focus_waited=true;
+    menu_context.close();if(previous!=ContextId::null())previous.open();
+}
 
 void ui_frame(){
 
@@ -1090,6 +1376,7 @@ void ui_frame(){
 
         recompui::set_idle_ui_rendering(false);
 
+        release_book_music0310();
         workshop::book::resume();
 
         fprintf(stderr,"[BookLink] ui=resume\n");fflush(stderr);
@@ -1108,6 +1395,30 @@ void ui_frame(){
 
     }
 
+#ifdef WORKSHOP_NATIVE_COOP
+    if(workshop_battle_failed()){
+        static bool shown=false;if(!shown){shown=true;open_book();auto previous=recompui::try_close_current_context();menu_context.open();loading_mode=true;
+            panel(tr("Bataille interrompue","Battle ended"),tr("Le parcours s’est arrêté avant la dixième victoire. Aucun défi de parcours complet n’est attribué.","The run ended before the tenth victory. No full-run challenge is awarded."));
+            action(0,tr("Menu principal","Main menu"),[]{route_native(-1);});menu_context.close();if(previous!=ContextId::null())previous.open();}return;
+    }
+    if(workshop_battle_done()){
+        static bool shown=false;if(!shown){shown=true;open_book();auto previous=recompui::try_close_current_context();menu_context.open();loading_mode=true;
+            std::string result=tr("Les dix combats ont été remportés !\n\n","All ten battles have been won!\n\n");
+            result+=workshop_battle_awarded()?tr("Le défi de ce Yoshi est enregistré.","This Yoshi’s challenge has been saved."):workshop_battle_diagnostic()?tr("Profil de test : aucun défi permanent n’est attribué.","Test profile: no permanent challenge is awarded."):tr("Le résultat n’a pas pu être enregistré. Le fichier des défis existant est conservé.","The result could not be saved. The existing challenge file has been preserved.");
+            panel(tr("Bataille terminée !","Battle complete!"),result);
+            action(0,tr("Menu principal","Main menu"),[]{route_native(-1);});menu_context.close();if(previous!=ContextId::null())previous.open();}return;
+    }
+    if(workshop_boss_solo_done()){
+        static bool shown=false;
+        if(!shown){
+            shown=true;open_book();auto previous=recompui::try_close_current_context();menu_context.open();loading_mode=true;
+            panel(tr("Premier enchaînement terminé","First sequence complete"),tr("Le premier combat et la salle de repos sont terminés.\n\nLes rencontres suivantes sont en préparation. Cet essai ne valide pas le défi des dix boss.","The first battle and rest room are complete.\n\nFurther encounters are being prepared. This test does not complete the ten-boss challenge."));
+            action(0,tr("Fermer cet essai","Close this test"),[]{close_custom_runtime(false);});
+            menu_context.close();if(previous!=ContextId::null())previous.open();
+        }
+        return;
+    }
+#endif
     if(workshop::custom_session::ready()){
 
         static bool shown=false;static uint64_t opened=0;
@@ -1138,15 +1449,26 @@ void ui_frame(){
 
     }
 
+    if(session_mode.load()==workshop::game_modes0320::StoryHard){
+        static std::string shown_error;const auto hard_error=workshop::story_hard_bridge0330::error();
+        if(hard_error.empty())shown_error.clear();
+        else if(hard_error!=shown_error){
+            shown_error=hard_error;open_book();auto previous=recompui::try_close_current_context();menu_context.open();
+            panel(tr("Story difficile interrompu","Hard Story paused"),std::string(tr("La reprise ou l’enregistrement n’a pas pu être validé. Les fichiers existants sont conservés.\n\n","The continuation or save could not be validated. Existing files have been preserved.\n\n"))+(workshop_hard_continue_refused()?tr("Le choix Nouvelle partie reste disponible dans le jeu.","New Game is still available in the game."):tr("Reviens au menu principal avant de réessayer.","Return to the main menu before trying again.")));
+            action(0,tr("Menu principal","Main menu"),[]{route_native(-1);});
+            if(workshop_hard_continue_refused())action(1,tr("Revenir au choix de partie","Return to run selection"),resume_game);
+            menu_context.close();if(previous!=ContextId::null())previous.open();return;
+        }
+    }
     if(workshop::book::take_open_request())open_book();
 
     bool book_shown=recompui::is_context_shown(menu_context);
 
     const auto native=workshop::book::snapshot();
 
-    bool show_link=ultramodern::is_game_started() && native.ready && session_mode.load()==0 && boot_mode.load()<0 && !book_shown && !recompui::config::get_config_modal()->is_open_now();
+    bool show_link=ultramodern::is_game_started() && native.ready && workshop::game_modes0320::story(session_mode.load()) && boot_mode.load()<0 && !book_shown && !recompui::config::get_config_modal()->is_open_now();
 
-    if(session_menu_button){if(session_mode.load()==0)session_menu_button->display_show();else session_menu_button->display_hide();}
+    if(session_menu_button){if(workshop::game_modes0320::story(session_mode.load()))session_menu_button->display_show();else session_menu_button->display_hide();}
 
     bool link_shown=recompui::is_context_shown(game_link_context);
 
@@ -1162,25 +1484,21 @@ void ui_frame(){
 
     if(s.ready && s.valid && s.frame!=snapshot_frame){
 
-        snapshot_frame=s.frame;progress={{"valid",true},{"storyMask",s.story},{"trialMask",s.trial},{"extraYoshiMask",s.extras}};
+        snapshot_frame=s.frame;
+        const nlohmann::json observed={{"valid",true},{"storyMask",s.story},{"trialMask",s.trial},{"extraYoshiMask",s.extras}};
+        if(session_mode.load()==workshop::game_modes0320::StoryHybrid){
+            story_progress0320=observed;
+            // Ownership is shared; only this run's native level data is local.
+            progress["extraYoshiMask"]=s.extras;
+        }
+        else if(session_mode.load()==workshop::game_modes0320::StoryHard)hard_progress0330=observed;
+        else progress=observed;
 
         if(!loading_mode)update_titles();
 
     }
 
     if(ultramodern::is_game_started() && !loading_mode)resume_button->display_show();else resume_button->display_hide();
-
-    // Rml applies display changes at its Update, after this callback. Wait one
-
-    // frame before focusing the newly shown page; the old focus was blurred.
-
-    if(focus_pending){
-
-        if(focus_waited && focus_pending->is_focusable()==Element::CanFocus::Yes && focus_pending->focus())focus_pending=nullptr;
-
-        else focus_waited=true;
-
-    }
 
 #ifdef WORKSHOP_CONTENT_BUILD
 
@@ -1241,8 +1559,14 @@ void workshop_menu_enable(){
     workshop::achievements::initialize();
 
     workshop::collections::initialize();
+    workshop::finds::initialize();
+    workshop::story_hybrid0320::initialize();
+    workshop::story_hard0330::initialize();
 
     workshop::hybrid_mode::initialize();
+    workshop::hybrid_completion0290::initialize("pc-hybrid-completion.json","pc-hybrid-records.json");
+    workshop::metal_yoshis0300::initialize();
+    (void)workshop::heart_shop0283::wallet();
 
     // The final credits image can stop submitting native display lists.
 
@@ -1250,7 +1574,7 @@ void workshop_menu_enable(){
 
     recompui::set_idle_ui_watchdog(true);
 
-    enabled=true;workshop::book::enable();std::ifstream file("book-menu.json");if(file)try{nlohmann::json j;file>>j;french=j.value("language",std::string("fr"))!="en";}catch(...){}
+    enabled=true;workshop::book::enable();std::ifstream file("book-menu.json");if(file)try{nlohmann::json j;file>>j;if(!j.is_object())throw std::runtime_error("preferences-shape");french=j.value("language",std::string("fr"))!="en";purchase_sound=j.value("purchaseSound",true);}catch(...){preferences_saved=false;}
 
     char* base=SDL_GetBasePath();if(base){pc_root=std::filesystem::u8path(base).parent_path().parent_path().parent_path();SDL_free(base);}
 
@@ -1320,9 +1644,17 @@ bool workshop_menu_enabled(){return enabled;}
 
 bool workshop_menu_french(){return enabled && french;}
 
-void workshop_menu_register(){if(enabled){
+void workshop_menu_register(){
+    // The frontend owns one callback slot; compose both overlays here.
+    recompui::register_frame_callback([]{
+        if(enabled){ui_frame();resolve_deferred_focus();frame_book_music0310();}
+#ifdef WORKSHOP_NATIVE_COOP
+        workshop::coop_health0250::ui::frame(ultramodern::is_game_started()&&!workshop::book::snapshot().paused&&!recompui::config::get_config_modal()->is_open_now(),workshop_menu_french());
+#endif
+    });
+if(enabled){
 
-    recompui::register_launcher_init_callback(create);recompui::register_launcher_update_callback(update);recompui::register_frame_callback(ui_frame);
+    recompui::register_launcher_init_callback(create);recompui::register_launcher_update_callback(update);
 
     recompui::config::create_tab(tr("Partie","Game"),"workshop-session",[](ContextId context,Element* parent){
 
@@ -1340,3 +1672,5 @@ void workshop_menu_register(){if(enabled){
 
 int workshop_menu_take_boot_mode(){return enabled?boot_mode.exchange(-1):-1;}
 
+
+int workshop_menu_session_mode(){return session_mode.load();}

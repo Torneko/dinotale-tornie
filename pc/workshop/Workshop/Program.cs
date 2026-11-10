@@ -18,7 +18,7 @@ static class Program {
 
         string root=args.Length>0 && !args[0].StartsWith("--")?Path.GetFullPath(args[0]):directory.FullName;
 
-        bool check=args.Contains("--startup-check");
+        bool check=args.Contains("--startup-check") || args.Any(a=>a.EndsWith("-ui-check")) || args.Contains("--editor-integration-check");
 
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
 
@@ -66,28 +66,49 @@ static class Program {
 
             }
 
-            var form=new WorkshopWindow(root);
+            var form=new WorkshopWindow(root,check);
 
             if(args.Contains("--editor") || args.Contains("--custom-games"))form.SelectSection(args.Contains("--custom-games"));
 
-            form.Shown+=(s,e)=>{
+            if(args.Contains("--coop") || args.Contains("--boss-battle"))form.SelectPreparationSection(args.Contains("--boss-battle"));
+
+            bool startupHandled=false;
+            EventHandler startup=(s,e)=>{
+                if(startupHandled)return;startupHandled=true;
 
                 var names=form.SectionNames;
 
-                if(names.Length!=5 || form.ClientSize.Width<900 || form.ClientSize.Height<600)throw new InvalidOperationException("Fenêtre initiale invalide.");
+                if(names.Length!=6 || form.ClientSize.Width<900 || form.ClientSize.Height<600)throw new InvalidOperationException("Fenêtre initiale invalide.");
 
                 Directory.CreateDirectory(Path.Combine(root,"build"));
 
-                File.WriteAllText(Path.Combine(root,"build/ui-startup-verification.json"),JsonSerializer.Serialize(new {windowCreated=true,shown=true,form.ClientSize.Width,form.ClientSize.Height,menus=names,visualReview="pending",mode=check?"startup-check":"interactive"},ProjectStore.Json));
+                File.WriteAllText(Path.Combine(root,"build/ui-startup-verification.json"),JsonSerializer.Serialize(new {windowCreated=true,shown=form.Visible,automatedCheck=check,form.ClientSize.Width,form.ClientSize.Height,menus=names,visualReview="pending",mode=check?"startup-check":"interactive"},ProjectStore.Json));
 
-                if(args.Contains("--render-editor-preview")){
+                if(args.Contains("--modes-ui-check")){
+                    form.BeginInvoke(async()=>{try{await form.RunModePreparationChecks();}catch(Exception e){File.WriteAllText(Path.Combine(root,"build/ui-startup-error.txt"),e.ToString());Environment.ExitCode=1;}finally{form.Close();}});
+                }else if(args.Contains("--navigation-ui-check")){
+                    form.SelectSection(false);form.BeginInvoke(()=>{form.RunNavigationChecks();form.RenderPreview(Path.Combine(root,"build/editor-0210/atelier-navigation.png"));form.Close();});
+                }else if(args.Contains("--editor-special-ui-check")){
+                    form.SelectSection(false);form.BeginInvoke(()=>{form.RunEditorSpecialChecks();form.RenderPreview(Path.Combine(root,"build/editor-0200/atelier-specials.png"));form.Close();});
+                }else if(args.Contains("--room-music-ui-check")){
+                    form.SelectSection(false);form.BeginInvoke(()=>{form.RunRoomMusicChecks();form.RenderPreview(Path.Combine(root,"build/editor-0200/atelier-music.png"));form.Close();});
+                }else if(args.Contains("--terrain-section-ui-check")){
+                    form.SelectSection(false);form.BeginInvoke(()=>{form.RunTerrainSectionChecks();form.RenderPreview(Path.Combine(root,"build/editor-0190/atelier-sections.png"));form.Close();});
+                }else if(args.Contains("--object-group-ui-check")){
+                    form.SelectSection(false);form.BeginInvoke(()=>{form.RunObjectGroupChecks();form.RenderPreview(Path.Combine(root,"build/editor-0180/atelier-groups.png"));if(!args.Contains("--keep-review-window"))form.Close();});
+                }else if(args.Contains("--fruit-bubble-ui-check")){
+                    form.SelectSection(false);form.BeginInvoke(()=>{form.RunFruitBubbleChecks();form.RenderPreview(Path.Combine(root,"build/editor-0170/atelier-bubbles.png"));form.Close();});
+                }else if(args.Contains("--render-editor-preview")){
 
-                    form.SelectSection(false);form.BeginInvoke(()=>{if(args.Contains("--editor-integration-check"))form.RunIntegrationChecks();form.RenderPreview(Path.Combine(root,"build/editor-0150/atelier-preview.png"));form.Close();});
+                    form.SelectSection(false);form.BeginInvoke(()=>{if(args.Contains("--editor-integration-check"))form.RunIntegrationChecks();form.RenderPreview(Path.Combine(root,"build/editor-0160/atelier-preview.png"));form.Close();});
 
                 }else if(check)form.BeginInvoke(()=>form.Close());
 
             };
 
+            // Hidden Windows launches may not deliver Shown. Queue checks after
+            // Load as well; BeginInvoke runs after the form has finished loading.
+            form.Shown+=startup;if(check)form.Load+=startup;
             Application.Run(form);
 
         }

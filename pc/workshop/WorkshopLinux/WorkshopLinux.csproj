@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup><TargetFramework>net9.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><AssemblyName>YoshiStory-AtelierLinux</AssemblyName><InvariantGlobalization>true</InvariantGlobalization><PublishTrimmed>false</PublishTrimmed><UseAppHost>true</UseAppHost></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../Core/Core.csproj" /><EmbeddedResource Include="index.html" /></ItemGroup>
+</Project>

@@ -7,6 +7,9 @@ namespace workshop::finds {
 struct View {unsigned found=0;bool initialized=false,migrated=false,readable=true,saved=true;};
 void initialize(const std::filesystem::path& path="pc-hybrid-finds.json");
 void migrate(uint8_t* rdram,unsigned story);
+// An alternate Story EEPROM must derive legacy rights from the validated
+// canonical source, never from its own fresh run payload.
+void migrate(uint8_t* rdram,const progress::State& authoritative,unsigned story,bool sourceValid);
 View view();
 unsigned available(unsigned eligible);
 void reset_attempt();
@@ -18,7 +21,10 @@ void created(uint32_t actor);
 bool egg_state(uint32_t actor,unsigned state);
 bool take_pickup_sound(uint32_t actor,unsigned state);
 uint32_t touching(uint8_t* rdram,uint32_t player);
+// pending() uses extension indices0..7; the original ledger remains six-bit.
 unsigned pending();
+unsigned pending_hybrids();
+unsigned pending_metals(); // Independent TWO-bit Gold/Silver field.
 bool finish(uint8_t* rdram);
 void clear_save();
 }

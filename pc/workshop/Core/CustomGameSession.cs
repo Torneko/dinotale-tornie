@@ -49,7 +49,7 @@ public sealed class CustomSessionState {
 
         ProjectStore.ValidateId(RunId);ProjectStore.ValidateId(GameId);
 
-        if(Schema!=1 || Levels.Count is <1 or >64 || Index<0 || Index>Levels.Count || Results.Count!=Index || PreferredColor is <-1 or >13 || Phase is not ("running" or "paused" or "completed"))throw new InvalidDataException("Suivi de partie invalide ; fichier conservé.");
+        if(Schema!=1 || Levels.Count is <1 or >64 || Index<0 || Index>Levels.Count || Results.Count!=Index || PreferredColor is <-1 or >15 || Phase is not ("running" or "paused" or "completed"))throw new InvalidDataException("Suivi de partie invalide ; fichier conservé.");
 
         if((Phase=="completed")!=(Index==Levels.Count) || ProcessId<0)throw new InvalidDataException("État de reprise incohérent.");
         foreach(var r in Results)ProjectStore.ValidateId(r.Token);
@@ -57,7 +57,7 @@ public sealed class CustomSessionState {
 
         foreach(var level in Levels)ProjectStore.Validate(level);
 
-        if(Results.Any(r=>r.Schema!=1 || !r.Completed || r.Fruits!=30 || r.SelectedColor is <0 or >13) || Results.Select(r=>r.Token).Distinct().Count()!=Results.Count)throw new InvalidDataException("Résultats personnalisés invalides.");
+        if(Results.Any(r=>r.Schema!=1 || !r.Completed || r.Fruits!=30 || r.SelectedColor is <0 or >15) || Results.Select(r=>r.Token).Distinct().Count()!=Results.Count)throw new InvalidDataException("Résultats personnalisés invalides.");
 
     }
 
@@ -65,7 +65,7 @@ public sealed class CustomSessionState {
 
         Validate();
 
-        if(Phase!="running" || Index>=Levels.Count || r.Schema!=1 || r.Token!=ExpectedToken || !r.Completed || r.Fruits!=30 || r.SelectedColor is <0 or >13 || Results.Any(x=>x.Token==r.Token))return false;
+        if(Phase!="running" || Index>=Levels.Count || r.Schema!=1 || r.Token!=ExpectedToken || !r.Completed || r.Fruits!=30 || r.SelectedColor is <0 or >15 || Results.Any(x=>x.Token==r.Token))return false;
 
         Results.Add(r);Index++;PreferredColor=r.SelectedColor;ExpectedToken="";Phase=Index==Levels.Count?"completed":"paused";return true;
 

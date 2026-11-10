@@ -58,7 +58,7 @@ void initialize(const std::filesystem::path& path){
         }
     }catch(...){ledger={};ledger.readable=false;ledger.saved=false;fprintf(stderr,"[Achievements] Existing file preserved; invalid or unsupported format.\n");}
 }
-void start_session(unsigned mode){std::lock_guard lock(mutex);session_allowed=mode<2 || mode==3;tracker.reset();}
+void start_session(unsigned mode){std::lock_guard lock(mutex);session_allowed=mode<2 || mode==3 || mode==5;tracker.reset();}
 View view(){std::lock_guard lock(mutex);return ledger;}
 void frame(uint8_t* rdram,recomp_context* ctx,bool allowed){
     constexpr auto root=gpr(int32_t(0x800F7EA0));

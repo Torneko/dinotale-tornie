@@ -1,6 +1,9 @@
 #include "workshop_menu_game.hpp"
 #include "workshop_menu.hpp"
 #include "story_progress.hpp"
+#include "game_modes0320.hpp"
+#include "hybrid_finds.hpp"
+#include "story_hard_bridge0330.hpp"
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -26,6 +29,11 @@ Snapshot read_snapshot(uint8_t* rdram,unsigned vi){
     if(s.valid){s.trial=p.trial;s.extras=workshop::progress::unlocked(p,s.story);}
     const auto finds=uint32_t(MEM_W(0,int32_t(0x807FC144)));
     if((finds&0xFFFFFFC0)==0xF17D0000)s.extras&=finds&63;
+    if(workshop_menu_session_mode()==game_modes0320::StoryHybrid){
+        const auto owned=workshop::finds::view();
+        s.extras=owned.initialized&&owned.readable&&owned.migrated&&owned.saved?owned.found&63:0;
+    }
+    if(workshop_menu_session_mode()==game_modes0320::StoryHard)s.extras=(workshop::story_hard_bridge0330::available().value_or(0)>>8)&63;
     s.player=MEM_W(0,gpr(int32_t(0x800F8828)));
     s.fruits=MEM_W(0,gpr(int32_t(0x800F89D0)));
     if(s.player>=0x80000000 && s.player<0x807FF000){
@@ -95,7 +103,8 @@ extern "C" int workshop_menu_title(uint8_t* rdram,recomp_context* ctx){
     if(mode<0){workshop::book::request_open();workshop::book::pause();return 1;}
     // Reached only after the real title Start. Retain native mode setup and
     // cleanup, before the four-choice menu is constructed.
-    const unsigned choice=mode==0?0:mode==2?3:1;
+    const int choice=workshop::game_modes0320::native_choice(mode);
+    if(choice<0)return 0;
     const auto pressed=MEM_HU(12,pad);
     MEM_W(0x16D10,data)=choice;MEM_H(12,pad)=0x1000;
     const auto saved=*ctx;

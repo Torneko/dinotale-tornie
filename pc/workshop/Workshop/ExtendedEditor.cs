@@ -18,7 +18,7 @@ public sealed partial class WorkshopWindow {
 
     readonly ComboBox variantChoice=new(){DropDownStyle=ComboBoxStyle.DropDownList,Width=220};
 
-    readonly ListBox sceneObjects=new(){Dock=DockStyle.Fill,DrawMode=DrawMode.OwnerDrawFixed,ItemHeight=43,IntegralHeight=false};
+    readonly ListBox sceneObjects=new(){SelectionMode=SelectionMode.MultiExtended,Dock=DockStyle.Fill,DrawMode=DrawMode.OwnerDrawFixed,ItemHeight=43,IntegralHeight=false};
 
     readonly TextBox sceneSearch=new(){Dock=DockStyle.Top,PlaceholderText="Chercher dans ce niveau",Height=30};
 
@@ -46,9 +46,9 @@ public sealed partial class WorkshopWindow {
 
         var header=new TableLayoutPanel{Dock=DockStyle.Fill,BackColor=Color.FromArgb(48,128,135),Padding=new(18,7,18,5),ColumnCount=1,RowCount=2};
         header.RowStyles.Add(new(SizeType.Percent,65));header.RowStyles.Add(new(SizeType.Percent,35));
-        header.Controls.Add(new Label{Dock=DockStyle.Fill,Text="DinoTale   /   Atelier de création",ForeColor=Color.White,Font=new("Segoe UI",22,FontStyle.Bold),TextAlign=ContentAlignment.MiddleLeft},0,0);
-        header.Controls.Add(new Label{Dock=DockStyle.Fill,Text="Crée tes niveaux · compose tes traversées · garde tes histoires",ForeColor=Color.FromArgb(239,242,212),Font=new("Segoe UI",10),TextAlign=ContentAlignment.MiddleLeft},0,1);
-        tabs.Dock=DockStyle.Fill;tabs.Padding=new(15,7);status.Dock=DockStyle.Fill;status.Text="Atelier 0.15.0 · créations séparées du jeu original";
+        header.Controls.Add(new Label{Dock=DockStyle.Fill,Text="DinoTale   /   Atelier de jeu et de création",ForeColor=Color.White,Font=new("Segoe UI",22,FontStyle.Bold),TextAlign=ContentAlignment.MiddleLeft},0,0);
+        header.Controls.Add(new Label{Dock=DockStyle.Fill,Text="Prépare tes parties · compose tes traversées · garde tes histoires",ForeColor=Color.FromArgb(239,242,212),Font=new("Segoe UI",10),TextAlign=ContentAlignment.MiddleLeft},0,1);
+        tabs.Dock=DockStyle.Fill;tabs.Padding=new(15,7);status.Dock=DockStyle.Fill;status.Text="Atelier 0.27.0 · créations séparées du jeu original";
 
         shell.Controls.Add(header,0,0);shell.Controls.Add(tabs,0,1);shell.Controls.Add(status,0,2);Controls.Add(shell);
 
@@ -78,7 +78,7 @@ public sealed partial class WorkshopWindow {
 
         sceneSearch.TextChanged+=(s,e)=>RefreshSceneObjects();
 
-        sceneObjects.DrawItem+=DrawSceneObject;sceneObjects.SelectedIndexChanged+=(s,e)=>{if(sceneUpdating || sceneObjects.SelectedItem is not ObjectRow row)return;canvas.Selected=row.Item;canvas.CenterOn(row.Item);ShowSelection();};
+        sceneObjects.DrawItem+=DrawSceneObject;sceneObjects.SelectedIndexChanged+=(s,e)=>{if(sceneUpdating)return;var items=sceneObjects.SelectedItems.Cast<ObjectRow>().Select(r=>r.Item).ToArray();canvas.CancelObjectGesture();canvas.SetObjectSelection(items,items.LastOrDefault(),false);if(canvas.Selected!=null)canvas.CenterOn(canvas.Selected);ShowSelection();};
 
         var palettePage=new TabPage("Ajouter");inspector.TabPages.Add(palettePage);palette.DrawMode=DrawMode.OwnerDrawFixed;palette.ItemHeight=43;palette.DropDownHeight=400;palette.Width=238;palette.DrawItem+=DrawPaletteItem;
 
@@ -90,9 +90,9 @@ public sealed partial class WorkshopWindow {
 
         variantChoice.Items.Add("Couleur native");foreach(var name in new[]{"Orange","Violet","Turquoise","Lime-céleri","Brun","Vert foncé"})variantChoice.Items.Add(name);variantChoice.SelectedIndex=0;
 
-        variantChoice.SelectedIndexChanged+=(s,e)=>{if(updating || canvas.Selected is not Placement p || !ObjectCatalog.IsMaskass(p.ObjectId))return;Remember();p.HybridVariant=variantChoice.SelectedIndex==0?null:variantChoice.SelectedIndex-1;dirty=true;canvas.Invalidate();RefreshSceneObjects();};
+        variantChoice.SelectedIndexChanged+=(s,e)=>{if(updating || canvas.SelectedObjects.Count!=1 || canvas.Selected is not Placement p || !ObjectCatalog.IsMaskass(p.ObjectId))return;Remember();p.HybridVariant=variantChoice.SelectedIndex==0?null:variantChoice.SelectedIndex-1;dirty=true;canvas.Invalidate();RefreshSceneObjects();};
 
-        propertiesPage.Controls.Add(Column(selection,Caption("Position X"),x,Caption("Position Y (vers le bas)"),y,Caption("Couleur du Maskass"),variantChoice,Button("Rétablir le point d’entrée",()=>Safe(RestoreNativeSpawn),235),Button("Dupliquer l’objet",()=>Safe(DuplicateObject),235),Button("Retirer l’objet",()=>Safe(RemoveObject),235),new Label{Width=235,Height=95,Text="Choisis une salle au-dessus de la vue. Le terrain et les collisions restent ceux de l’original.",Padding=new(0,14,0,0)}));
+        propertiesPage.Controls.Add(Column(selection,Caption("Position X"),x,Caption("Position Y (vers le bas)"),y,Caption("Couleur du Maskass"),variantChoice,Button("Rétablir le point d’entrée",()=>Safe(RestoreNativeSpawn),235),Button("Dupliquer la sélection",()=>Safe(DuplicateObject),235),Button("Retirer la sélection",()=>Safe(RemoveObject),235),new Label{Width=235,Height=95,Text="Choisis une salle au-dessus de la vue. L’onglet Terrain permet de peindre les tuiles et leurs collisions.",Padding=new(0,14,0,0)}));
 
         BuildTerrainPanels(inspector);
 
@@ -102,6 +102,7 @@ public sealed partial class WorkshopWindow {
 
         gridChoice.CheckedChanged+=(s,e)=>{canvas.ShowGrid=gridChoice.Checked;canvas.Invalidate();};technicalChoice.CheckedChanged+=(s,e)=>{canvas.ShowTechnical=technicalChoice.Checked;canvas.Invalidate();RefreshSceneObjects();};snapChoice.SelectedIndexChanged+=(s,e)=>canvas.SnapSize=snapChoice.SelectedIndex switch{1=>16,2=>32,3=>64,_=>0};
 
+        var groupTools=BuildGroupTools();center.Controls.Add(groupTools);
         var tools=Bar(roomChoice,Button("Vue d’ensemble",canvas.Fit,145),Button("Annuler",Undo,90),Button("Rétablir",Redo,90),gridChoice,snapChoice,technicalChoice);center.Controls.Add(tools);
 
         var columns=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,RowCount=1};columns.ColumnStyles.Add(new(SizeType.Absolute,270));columns.ColumnStyles.Add(new(SizeType.Percent,100));columns.ColumnStyles.Add(new(SizeType.Absolute,275));columns.Controls.Add(library,0,0);columns.Controls.Add(center,1,0);columns.Controls.Add(inspector,2,0);page.Controls.Add(columns);
@@ -116,6 +117,8 @@ public sealed partial class WorkshopWindow {
 
     }
 
+    void RefreshSourceSummary(){if(current!=null)sourceSummary.Text=$"Source {VanillaRom.SourceCode(current.SourceZone)} · {current.Rooms.Count+1} salles · {RoomLabel(activeRoom)} · {SceneObjects.Count} objets. Maj-clic : sélection multiple | rectangle sur le vide | clic droit : parcourir | molette : zoomer.";}
+
     void RefreshExtendedCategories(){
 
         paletteUpdating=true;string? selected=objectCategory.SelectedItem?.ToString();objectCategory.Items.Clear();objectCategory.Items.Add("Toutes les catégories");
@@ -124,7 +127,7 @@ public sealed partial class WorkshopWindow {
 
         objectCategory.SelectedItem=selected;if(objectCategory.SelectedIndex<0)objectCategory.SelectedIndex=0;paletteUpdating=false;RefreshExtendedPalette();
 
-        if(current!=null)sourceSummary.Text=$"Source {VanillaRom.SourceCode(current.SourceZone)} · {current.Rooms.Count+1} salles · {RoomLabel(activeRoom)} · {SceneObjects.Count} objets. Glisser : déplacer | clic droit : parcourir | molette : zoomer | Alt : ignorer l’aimantation.";
+        RefreshSourceSummary();
 
     }
 
@@ -145,31 +148,27 @@ public sealed partial class WorkshopWindow {
     sealed record ObjectRow(Placement Item,string Text){public override string ToString()=>Text;}
 
     void RefreshSceneObjects(){
-
-        sceneUpdating=true;var selected=canvas.Selected;string query=sceneSearch.Text.Trim();sceneObjects.Items.Clear();
-
+        sceneUpdating=true;string query=sceneSearch.Text.Trim();sceneObjects.Items.Clear();
         if(current!=null)foreach(var p in SceneObjects){if(!technicalChoice.Checked && p.ObjectId>=0x8000)continue;string text=ObjectCatalog.Get(ObjectCatalog.PaletteId(p)).DisplayName;if(query.Length>0 && !text.Contains(query,StringComparison.CurrentCultureIgnoreCase))continue;sceneObjects.Items.Add(new ObjectRow(p,text));}
-
-        sceneObjects.SelectedItem=sceneObjects.Items.Cast<ObjectRow>().FirstOrDefault(r=>r.Item==selected);sceneUpdating=false;RefreshPassages();
-
+        SyncSceneSelection();sceneUpdating=false;RefreshPassages();
     }
-
-    void SyncSceneSelection(){sceneUpdating=true;sceneObjects.SelectedItem=sceneObjects.Items.Cast<ObjectRow>().FirstOrDefault(r=>r.Item==canvas.Selected);sceneUpdating=false;}
+    void SyncSceneSelection(){bool before=sceneUpdating;sceneUpdating=true;for(int i=0;i<sceneObjects.Items.Count;i++)sceneObjects.SetSelected(i,canvas.SelectedObjects.Contains(((ObjectRow)sceneObjects.Items[i]).Item));sceneUpdating=before;}
 
     void DrawSceneObject(object? sender,DrawItemEventArgs e){if(e.Index<0 || e.Index>=sceneObjects.Items.Count || sceneObjects.Items[e.Index] is not ObjectRow row)return;e.DrawBackground();EditorVisuals.Draw(e.Graphics,new(e.Bounds.X+6,e.Bounds.Y+5,31,31),row.Item);TextRenderer.DrawText(e.Graphics,row.Text,Font,new Rectangle(e.Bounds.X+45,e.Bounds.Y+5,e.Bounds.Width-48,33),e.ForeColor,TextFormatFlags.EndEllipsis|TextFormatFlags.VerticalCenter);e.DrawFocusRectangle();}
 
     void DrawPaletteItem(object? sender,DrawItemEventArgs e){if(e.Index<0 || e.Index>=palette.Items.Count || palette.Items[e.Index] is not PaletteItem item)return;e.DrawBackground();EditorVisuals.Draw(e.Graphics,new(e.Bounds.X+4,e.Bounds.Y+5,30,30),new Placement{ObjectId=item.Id});TextRenderer.DrawText(e.Graphics,item.Text,Font,new Rectangle(e.Bounds.X+42,e.Bounds.Y+4,e.Bounds.Width-44,34),e.ForeColor,TextFormatFlags.EndEllipsis|TextFormatFlags.VerticalCenter);e.DrawFocusRectangle();}
 
     void EditorKeys(object? sender,KeyEventArgs e){
-
-        if(e.Control && e.KeyCode==Keys.S){Safe(SaveLevel);e.SuppressKeyPress=true;return;}if(!canvas.ContainsFocus)return;
-
-        Action? action=e.Control && e.KeyCode==Keys.Z?Undo:e.Control && e.KeyCode==Keys.Y?Redo:e.Control && e.KeyCode==Keys.D?()=>Safe(DuplicateObject):e.KeyCode==Keys.Delete?()=>Safe(RemoveObject):null;
-
-        if(action!=null){action();e.SuppressKeyPress=true;return;}int step=e.Shift?16:1;
-
-        if(e.KeyCode is Keys.Left or Keys.Right or Keys.Up or Keys.Down){canvas.Nudge(e.KeyCode==Keys.Left?-step:e.KeyCode==Keys.Right?step:0,e.KeyCode==Keys.Up?-step:e.KeyCode==Keys.Down?step:0);e.SuppressKeyPress=true;}
-
+        if(e.Control && e.KeyCode==Keys.S){Safe(SaveLevel);e.SuppressKeyPress=true;return;}
+        if(!canvas.ContainsFocus && !sceneObjects.ContainsFocus)return;
+        Action? history=e.Control && e.KeyCode==Keys.Z?Undo:e.Control && e.KeyCode==Keys.Y?Redo:null;
+        if(history!=null){canvas.CancelObjectGesture();canvas.CancelTerrainGesture();history();e.SuppressKeyPress=true;return;}
+        if(canvas.ContainsFocus && HandleTerrainSectionKeys(e))return;
+        if(canvas.TerrainTool!=TerrainTool.Objects)return;
+        Action? action=e.Control && e.KeyCode==Keys.A?SelectAllSceneObjects:e.Control && e.KeyCode==Keys.C?()=>Safe(CopySelectedObjects):e.Control && e.KeyCode==Keys.V?()=>Safe(PasteSelectedObjects):e.Control && e.KeyCode==Keys.X?()=>Safe(CutSelectedObjects):e.Control && e.KeyCode==Keys.D?()=>Safe(DuplicateObject):e.KeyCode==Keys.Delete?()=>Safe(RemoveObject):null;
+        if(action!=null){canvas.CancelObjectGesture();action();e.SuppressKeyPress=true;return;}
+        if(!canvas.ContainsFocus)return;int step=e.Shift?16:1;
+        if(e.KeyCode is Keys.Left or Keys.Right or Keys.Up or Keys.Down){canvas.CancelObjectGesture();canvas.Nudge(e.KeyCode==Keys.Left?-step:e.KeyCode==Keys.Right?step:0,e.KeyCode==Keys.Up?-step:e.KeyCode==Keys.Down?step:0);e.SuppressKeyPress=true;}
     }
 
     void StartCustomGame(bool resume){if(game==null)throw new InvalidOperationException("Créer ou choisir une partie.");EnsureGameClosed();if(!resume && dirty && current!=null && game.LevelIds.Contains(current.Id))SaveLevel();SaveGame();sessions.Start(game,store,resume);RefreshSessionStatus();status.Text=resume?"Reprise de la partie personnalisée.":"Partie ouverte : Start, puis choisis ton Yoshi. Les victoires enchaînent les niveaux.";}
@@ -191,7 +190,8 @@ public sealed partial class WorkshopWindow {
         game=new CustomGame{Name="Traversée de validation",LevelIds=[first,second]};gameName.Text=game.Name;SaveGame();
         if(store.Games().Single(g=>g.Id==game!.Id).LevelIds.Count!=2)throw new Exception("Ordre de partie perdu.");
         var saved=store.Levels().Single(l=>l.Id==first);if(saved.Objects.Single(p=>p.HybridVariant.HasValue).HybridVariant!=5)throw new Exception("Couleur non sauvegardée.");
-        CheckRoomEditorIntegration();CheckTerrainIntegration();
+        CheckCustomGameEditing();
+        CheckRoomEditorIntegration();CheckTerrainIntegration();CheckTerrainPaintingIntegration();
         File.WriteAllText(Path.Combine(pcRoot,"build/editor-0150/ui-integration.json"),System.Text.Json.JsonSerializer.Serialize(new{sourceChoices=24,paletteSearch=true,maskassVariantAddEditSave=true,undoRedo=true,coordinateEdit=true,previewIcon=true,secondSourceClone=true,customGameOrder=true,isolatedRoot=pcRoot},ProjectStore.Json));
     }
     public void RenderPreview(string path){Directory.CreateDirectory(Path.GetDirectoryName(path)!);using var bitmap=new Bitmap(Width,Height);DrawToBitmap(bitmap,new Rectangle(0,0,Width,Height));bitmap.Save(path,ImageFormat.Png);}

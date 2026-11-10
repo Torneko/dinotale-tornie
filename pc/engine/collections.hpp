@@ -22,7 +22,7 @@ struct State {
 };
 struct View {State state;bool readable=true,saved=true;};
 void initialize(const std::filesystem::path& path="pc-collection.json");
-void start_session(unsigned mode);
+void start_session(unsigned mode,unsigned canonical_trial=0,unsigned canonical_eggs=0,bool canonical_valid=false);
 View view();
 bool purchase(Item item);
 bool editor_unlocked();

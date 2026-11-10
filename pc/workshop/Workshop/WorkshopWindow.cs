@@ -19,6 +19,7 @@ namespace WorkshopApp;
 public sealed partial class WorkshopWindow : Form {
 
     readonly string pcRoot;
+    readonly bool automatedChecks;
 
     readonly ProjectStore store;
 
@@ -74,7 +75,8 @@ public sealed partial class WorkshopWindow : Form {
 
 
 
-    public WorkshopWindow(string root) {
+    public WorkshopWindow(string root,bool automatedChecks=false) {
+        this.automatedChecks=automatedChecks;
 
         pcRoot=root;store=new(Path.Combine(root,"content"));runner=new(root);contentTest=new(root);specialRunner=new(root);
 
@@ -84,7 +86,7 @@ public sealed partial class WorkshopWindow : Form {
 
         EditorVisuals.AssetRoot=Directory.Exists(Path.Combine(root,"assets/editor"))?Path.Combine(root,"assets/editor"):Path.Combine(root,"build/special-assets");
 
-        Text="DinoTale — Atelier 0.15.0";Width=1460;Height=920;MinimumSize=new(1160,740);KeyPreview=true;
+        Text="DinoTale — Atelier 0.27.0";Width=1460;Height=920;MinimumSize=new(1160,740);KeyPreview=true;
 
         Font=new("Segoe UI",10);BackColor=Color.FromArgb(246,244,232);ForeColor=Color.FromArgb(32,48,42);
 
@@ -92,7 +94,7 @@ public sealed partial class WorkshopWindow : Form {
 
         foreach(var list in new[]{levels,gameLevels}){list.DrawMode=DrawMode.OwnerDrawFixed;list.ItemHeight=64;list.IntegralHeight=false;list.DrawItem+=DrawLevelItem;}
 
-        BuildHome();BuildEditor();BuildGames();BuildCoop();BuildNotes();
+        LoadModeSetup();BuildHome();BuildEditor();BuildGames();BuildCoop();BuildBossPreparation();BuildNotes();
 
         RefreshLevels();RefreshGames();
 
@@ -113,9 +115,9 @@ public sealed partial class WorkshopWindow : Form {
         Shown+=(s,e)=>{canvas.Fit();captureTimer.Start();};
         captureTimer.Tick+=(s,e)=>RefreshCaptureHotkey();
 
-        FormClosed+=(s,e)=>{captureTimer.Stop();captureTimer.Dispose();UnregisterCaptureHotkey();EditorVisuals.Clear();};
+        FormClosed+=(s,e)=>{captureTimer.Stop();captureTimer.Dispose();UnregisterCaptureHotkey();EditorVisuals.Clear();groupTips.Dispose();};
 
-        FormClosing+=(s,e)=>{if(specialRunner.IsRunning){e.Cancel=true;WindowState=FormWindowState.Minimized;status.Text="L’Atelier accompagne ta partie ; ferme d’abord la fenêtre de jeu.";}else if(!ConfirmDiscard())e.Cancel=true;};
+        FormClosing+=(s,e)=>{if(specialRunner.IsRunning){e.Cancel=true;WindowState=FormWindowState.Minimized;status.Text="L’Atelier accompagne ta partie ; ferme d’abord la fenêtre de jeu.";}else if(!ConfirmDiscard() || !ConfirmGameDiscard())e.Cancel=true;};
 
     }
 
@@ -129,11 +131,19 @@ public sealed partial class WorkshopWindow : Form {
 
     }
 
-    void Safe(Action action) {try {action();}catch(Exception e){MessageBox.Show(this,e.Message,"Atelier PC",MessageBoxButtons.OK,MessageBoxIcon.Information);}}
+    void Safe(Action action) {try {action();}catch(Exception e){if(automatedChecks)throw;MessageBox.Show(this,e.Message,"Atelier PC",MessageBoxButtons.OK,MessageBoxIcon.Information);}}
 
     void DrawLevelItem(object? sender,DrawItemEventArgs e){
 
-        if(sender is not ListBox list || e.Index<0 || e.Index>=list.Items.Count || list.Items[e.Index] is not LevelProject item)return;
+        if(sender is not ListBox list || e.Index<0 || e.Index>=list.Items.Count)return;
+        var row=list.Items[e.Index] as GameLevelRow;
+        var item=list.Items[e.Index] as LevelProject ?? row?.Level;
+        if(item==null){
+            if(row==null)return;e.DrawBackground();
+            TextRenderer.DrawText(e.Graphics,"?",Font,new Rectangle(e.Bounds.X+5,e.Bounds.Y+5,90,50),e.ForeColor,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter);
+            TextRenderer.DrawText(e.Graphics,row.Name,e.Font??Font,new Rectangle(e.Bounds.X+102,e.Bounds.Y+9,Math.Max(10,e.Bounds.Width-108),45),e.ForeColor,TextFormatFlags.EndEllipsis|TextFormatFlags.VerticalCenter);
+            e.DrawFocusRectangle();return;
+        }
 
         e.DrawBackground();var rect=new Rectangle(e.Bounds.X+5,e.Bounds.Y+5,90,50);
 
@@ -156,20 +166,11 @@ public sealed partial class WorkshopWindow : Form {
     static Label Note(string text,int height=65)=>new(){Text=text,Dock=DockStyle.Top,Height=height,Padding=new(8),AutoEllipsis=true};
 
     void BuildHome(){
-
-        var p=Page("Accueil");
-
-        p.Controls.Add(Note("Duplique l’un des 24 niveaux et modifie les objets de ses salles. Compose ta traversée et retrouve ta progression à la prochaine session. Le jeu d’origine et tes créations restent séparés.",90));
-
-        p.Controls.Add(Bar(Button("Créer ou modifier un niveau",()=>tabs.SelectedIndex=1,270),Button("Mes parties personnalisées",()=>tabs.SelectedIndex=2,270)));
-
-        p.Controls.Add(Note("Dans l’éditeur : fruits illustrés, Maskass hybrides, liste des objets, grille et aimantation. Pendant un test, F8 prend une capture du jeu pour l’icône de ton niveau.",90));
-
-        p.Controls.Add(new Label{Text="Ton atelier d’histoires",Dock=DockStyle.Top,Height=90,Padding=new(15),Font=new("Segoe UI",27,FontStyle.Bold)});
-
+        var page=Page("Accueil");
+        var links=new FlowLayoutPanel{AutoSize=true,WrapContents=true,MaximumSize=new(1100,0),Margin=new(3,12,3,12)};
+        links.Controls.AddRange(new Control[]{Button("Créer ou modifier un niveau",()=>tabs.SelectedIndex=1,285),Button("Mes parties personnalisées",()=>tabs.SelectedIndex=2,285),Button("Préparer la coop",()=>SelectPreparationSection(false),285),Button("Préparer le Boss Battle",()=>SelectPreparationSection(true),285)});
+        page.Controls.Add(ModeColumn(ModeText("Ton atelier d’histoires",1100,26,true),ModeText("Retrouve tes créations, compose tes traversées et prépare les prochains modes de jeu.",1100,12),links,ModeText("L’éditeur permet de copier les vingt-quatre niveaux et de modifier leurs salles. Les parties personnalisées enchaînent tes niveaux enregistrés.",1100),ModeText("Coopération : prépare les deux Yoshis et les règles, puis ouvre ou rejoins un salon. Boss Battle : prépare et conserve ton parcours de dix rencontres surprises.",1100),ModeText("Pendant un essai de niveau, F8 prend une capture du jeu pour son icône.",1100)));
     }
-
-
 
     string RomPath()=>specialRunner.OriginalRom;
     void BuildEditor()=>BuildExtendedEditor();
@@ -182,33 +183,25 @@ public sealed partial class WorkshopWindow : Form {
 
         var split=new SplitContainer {Size=new(1200,600),Dock=DockStyle.Fill,SplitterDistance=280,Panel1MinSize=240,FixedPanel=FixedPanel.Panel1};
 
-        split.Panel1.Controls.Add(games);split.Panel1.Controls.Add(Bar(Button("Nouvelle partie",()=>{game=new();gameName.Text=game.Name;interactions.Checked=false;RefreshGameLevels();},190)));
+        split.Panel1.Controls.Add(games);split.Panel1.Controls.Add(Bar(Button("Nouvelle partie",NewCustomGame,190)));
 
-        games.SelectedIndexChanged+=(s,e)=>{if(games.SelectedItem is CustomGame g){game=g;gameName.Text=g.Name;interactions.Checked=g.Coop.PlayerInteractions;RefreshGameLevels();RefreshSessionStatus();}};
+        games.SelectedIndexChanged+=(s,e)=>SelectCustomGame();
+        gameName.TextChanged+=(s,e)=>{if(!gameUpdating && game!=null){game.Name=gameName.Text;MarkGameDirty();}};
+        interactions.CheckedChanged+=(s,e)=>{if(!gameUpdating && game!=null){game.Coop.PlayerInteractions=interactions.Checked;MarkGameDirty();}};
 
         split.Panel2.Controls.Add(gameLevels);
 
         split.Panel2.Controls.Add(Bar(Button("Ajouter le niveau de l’éditeur",()=>Safe(AddToGame),255),Button("Monter",()=>MoveGameLevel(-1),90),Button("Descendre",()=>MoveGameLevel(1),110),Button("Retirer de la liste",RemoveGameLevel,160)));
 
+        split.Panel2.Controls.Add(Bar(interactions));
+        split.Panel2.Controls.Add(gameSaveStatus);
         split.Panel2.Controls.Add(Bar(gameName,Button("Enregistrer la partie",()=>Safe(SaveGame),190),Button("Tester le niveau choisi",()=>Safe(TestGameLevel),210),Button("Jouer la partie",()=>Safe(()=>StartCustomGame(false)),165),Button("Reprendre",()=>Safe(()=>StartCustomGame(true)),120)));
 
         p.Controls.Add(split);p.Controls.Add(Note("Compose et sauvegarde une liste de niveaux. Chaque copie garde son décor d’origine. Après une victoire, la partie passe au niveau suivant ; « Reprendre » continue une traversée interrompue.",72));
 
     }
 
-    void BuildCoop() {
-
-        var p=Page("Coopération");
-
-        var text="Deux modes prévus :\n\n• Local : deux manettes sur le même PC.\n• Réseau : un joueur héberge, l’autre rejoint sa partie.\n\nRègles retenues : fruits comptés ensemble, ennemis communs.\nLes Yoshis ne se bloquent pas par défaut.\nLes œufs traversent toujours le coéquipier et ne lui font aucun dégât.\n\nLa coop jouable n’est pas encore disponible dans ce prototype.";
-
-        p.Controls.Add(Note("L’option d’interaction est mémorisée pour la partie ; les œufs resteront sans effet sur le coéquipier même si elle est activée.",65));
-
-        p.Controls.Add(Bar(interactions,Button("Sauver pour la partie choisie",()=>Safe(()=>{if(game==null)throw new InvalidOperationException("Choisir d’abord une partie personnalisée.");game.Coop.PlayerInteractions=interactions.Checked;SaveGame();}),265)));
-
-        p.Controls.Add(Note(text,330));
-
-    }
+    void BuildCoop()=>BuildCoopPreparation();
 
     void BuildNotes() {
 
@@ -216,7 +209,7 @@ public sealed partial class WorkshopWindow : Form {
 
         p.AutoScroll=true;
 
-        p.Controls.Add(Note("Le projet PC reste séparé de la ROM N64 9.2. Les six nouveaux fruits peuvent être placés et mangés dans tes niveaux personnalisés. Les six couleurs de Maskass et l’enchaînement des niveaux sont disponibles. La coop jouable reste à développer.",90));
+        p.Controls.Add(Note("Le projet PC reste séparé de la ROM N64 9.2. Les six nouveaux fruits peuvent être placés et mangés dans tes niveaux personnalisés. Les six couleurs de Maskass et l’enchaînement des niveaux sont disponibles. Les préparations de coop et de Boss Battle se trouvent dans leurs onglets. Leurs combats et le jeu à deux sont en cours d’intégration.",90));
 
         p.Controls.Add(Note("Favoris affichés dans la pause :\nNouveaux Yoshis : deux fruits classiques (+2) + leur hybride (+4 points et +4 de vie).\nYoshis d’origine : leur fruit classique + trois hybrides (+2).\nRouge/rose : pêche, mûre, prune • Jaune : pêche, poire, kiwi\nVert : bleuet, poire, prune • Bleu/bleu pâle : mûre, bleuet, kiwi\nBlanc et noir gardent +2 pour les hybrides. Ennemis : moyenne des deux couleurs, arrondie au-dessus ; bonus de vie converti en points ×2 si tués.",180));
 
@@ -254,9 +247,7 @@ public sealed partial class WorkshopWindow : Form {
 
     }
 
-    void RefreshGames(){string? id=game?.Id;games.Items.Clear();foreach(var g in store.Games())games.Items.Add(g);if(id!=null)games.SelectedItem=games.Items.Cast<CustomGame>().FirstOrDefault(g=>g.Id==id);}
-
-    bool ConfirmDiscard()=>!dirty || MessageBox.Show(this,"Des modifications ne sont pas enregistrées. Continuer ?","Niveau modifié",MessageBoxButtons.YesNo,MessageBoxIcon.Question)==DialogResult.Yes;
+    bool ConfirmDiscard()=>ConfirmUnsaved(dirty,"Niveau modifié","Des modifications du niveau ne sont pas enregistrées. Continuer ?");
 
     void LoadLevel(LevelProject l){current=JsonSerializer.Deserialize<LevelProject>(JsonSerializer.Serialize(l,ProjectStore.Json),ProjectStore.Json)!;updating=true;levelName.Text=current.Name;updating=false;dirty=false;undo.Clear();redo.Clear();RefreshRoomChoices(current.SourceZone);}
 
@@ -280,13 +271,27 @@ public sealed partial class WorkshopWindow : Form {
 
     void Restore(string json)=>RestoreEditState(json);
 
-    void ShowSelection(){updating=true;var o=canvas.Selected;selection.Text=o==null?"Sélectionne un objet.":ObjectCatalog.Get(ObjectCatalog.PaletteId(o)).Name;x.Enabled=y.Enabled=o!=null && o.ObjectId<0x8000 && o.ObjectId!=0x4001;if(o!=null){x.Value=Math.Clamp((decimal)o.X,x.Minimum,x.Maximum);y.Value=Math.Clamp((decimal)o.Y,y.Minimum,y.Maximum);}variantChoice.Enabled=o!=null && ObjectCatalog.IsMaskass(o.ObjectId);variantChoice.SelectedIndex=o?.HybridVariant is int c?c+1:0;updating=false;SyncSceneSelection();}
-
-    void UpdateCoordinate(bool horizontal){if(updating || canvas.Selected==null)return;Remember();if(horizontal)canvas.Selected.X=(float)x.Value;else canvas.Selected.Y=(float)y.Value;dirty=true;canvas.Invalidate();}
-
-    void DuplicateObject(){if(canvas.Selected==null || current==null)return;if(canvas.Selected.ObjectId>=0x8000)throw new InvalidOperationException("Les couches de décor sont conservées dans cette version.");if(canvas.Selected.ObjectId==0x4001)throw new InvalidOperationException("Un seul point de départ de Yoshi est nécessaire.");CheckObjectCapacity();Remember();var p=canvas.Selected.Copy();p.X+=24;SceneObjects.Add(p);canvas.Selected=p;dirty=true;canvas.Invalidate();RefreshSceneObjects();ShowSelection();}
-
-    void RemoveObject(){if(canvas.Selected==null || current==null)return;if(canvas.Selected.ObjectId>=0x8000)throw new InvalidOperationException("Les couches de décor sont conservées dans cette version.");if(canvas.Selected.ObjectId==0x4001)throw new InvalidOperationException("Conserver le point de départ de Yoshi.");Remember();SceneObjects.Remove(canvas.Selected);canvas.Selected=null;dirty=true;canvas.Invalidate();RefreshSceneObjects();ShowSelection();}
+    void ShowSelection(){
+        updating=true;var o=canvas.Selected;int count=canvas.SelectedObjects.Count;
+        selection.Text=count>1?$"{count} objets sélectionnés. X/Y déplacent le groupe.":o==null?"Sélectionne un objet.":ObjectCatalog.Get(ObjectCatalog.PaletteId(o)).Name;
+        x.Enabled=y.Enabled=count>0 && (canvas.SelectedObjects.All(ObjectGroups.Editable) || count==1 && o?.ObjectId==0x4001);
+        if(o!=null){x.Value=Math.Clamp((decimal)o.X,x.Minimum,x.Maximum);y.Value=Math.Clamp((decimal)o.Y,y.Minimum,y.Maximum);}
+        variantChoice.Enabled=count==1 && o!=null && ObjectCatalog.IsMaskass(o.ObjectId);variantChoice.SelectedIndex=o?.HybridVariant is int c?c+1:0;
+        updating=false;SyncSceneSelection();RefreshGroupButtons();RefreshSourceSummary();
+    }
+    void UpdateCoordinate(bool horizontal){
+        if(updating || canvas.Selected==null)return;
+        if(canvas.Selected.ObjectId==0x4001){
+            try{ChangeEntry(horizontal?(float)x.Value:canvas.Selected.X,horizontal?canvas.Selected.Y:(float)y.Value);}
+            catch(InvalidDataException error){status.Text=error.Message;}
+            finally{RefreshEntryControls();ShowSelection();}
+            return;
+        }
+        float delta=(float)(horizontal?x.Value:y.Value)-(horizontal?canvas.Selected.X:canvas.Selected.Y);
+        canvas.MoveObjectSelection(horizontal?delta:0,horizontal?0:delta);ShowSelection();
+    }
+    void DuplicateObject()=>DuplicateSelectedObjects();
+    void RemoveObject()=>RemoveSelectedObjects();
 
     void AddObject(){if(current==null || palette.SelectedItem is not PaletteItem item)return;CheckObjectCapacity();Remember();var pos=canvas.WorldCenter;var p=rom.CreatePlacement(item.Id,activeRoom);p.X=Math.Clamp(pos.X,-100000,100000);p.Y=Math.Clamp(pos.Y,-100000,100000);SceneObjects.Add(p);canvas.Selected=p;dirty=true;canvas.Invalidate();RefreshSceneObjects();ShowSelection();}
 
@@ -317,18 +322,6 @@ public sealed partial class WorkshopWindow : Form {
         levels.Invalidate();gameLevels.Invalidate();status.Text="Capture importée comme icône du niveau.";
 
     }
-
-    void SaveGame(){if(game==null)throw new InvalidOperationException("Créer ou sélectionner une partie.");game.Name=gameName.Text;game.Coop.PlayerInteractions=interactions.Checked;store.Save(game);RefreshGames();status.Text="Partie personnalisée enregistrée.";}
-
-    void AddToGame(){if(game==null || current==null)throw new InvalidOperationException("Ouvrir un niveau dans l’éditeur et créer une partie.");SaveLevel();game.LevelIds.Add(current.Id);RefreshGameLevels();}
-
-    void RefreshGameLevels(){gameLevels.Items.Clear();if(game==null)return;var known=store.Levels().ToDictionary(l=>l.Id);foreach(var id in game.LevelIds)if(known.TryGetValue(id,out var l))gameLevels.Items.Add(l);}
-
-    void MoveGameLevel(int delta){if(game==null)return;int i=gameLevels.SelectedIndex,j=i+delta;if(i<0 || j<0 || j>=game.LevelIds.Count)return;(game.LevelIds[i],game.LevelIds[j])=(game.LevelIds[j],game.LevelIds[i]);RefreshGameLevels();gameLevels.SelectedIndex=j;}
-
-    void RemoveGameLevel(){int i=gameLevels.SelectedIndex;if(game==null || i<0)return;game.LevelIds.RemoveAt(i);RefreshGameLevels();}
-
-    void TestGameLevel(){if(gameLevels.SelectedItem is not LevelProject l)throw new InvalidOperationException("Choisir un niveau dans la partie.");LaunchLevel(l);}
 
     sealed record PaletteItem(ushort Id,string Text);
 

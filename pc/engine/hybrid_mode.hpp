@@ -9,7 +9,9 @@ constexpr bool entitled(unsigned trial,bool purchased){return trial==0xFFFFFF &&
 void initialize(const std::filesystem::path& path="pc-hybrid-records.json");
 bool readable();
 bool saved();
-void activate(bool value);
+// Story Hybrid shares content, but keeps its own native Story score table.
+// Existing one-argument callers retain the Hybrid Trial record bank.
+void activate(bool value,bool use_hybrid_trial_records=true);
 void custom_placements(std::span<const uint8_t> payload);
 bool active();
 void initialize_ram(uint8_t* rdram);

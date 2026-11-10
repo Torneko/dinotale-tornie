@@ -47,6 +47,11 @@
 #ifdef YOSHI_WORKSHOP
 #include "workshop_loader.hpp"
 #include "workshop_menu.hpp"
+#include "menu_music_gate0310.hpp"
+#include "menu_music_session0310.hpp"
+#endif
+#ifdef WORKSHOP_CONTENT_BUILD
+#include "purchase_audio0284.hpp"
 #endif
 
 #if defined(DT_HAS_APP_ICON)
@@ -218,12 +223,77 @@ static void update_gfx(void*) {
     recompinput::handle_events();
 }
 
+#ifdef WORKSHOP_CONTENT_BUILD
+namespace {
+struct PurchaseAudioDevice0284 {
+    SDL_AudioDeviceID device = 0;
+    mutable bool failure_reported = false;
+    void report_failure(const char* operation, const char* detail) const noexcept {
+        if (failure_reported) return;
+        failure_reported = true;
+        fprintf(stderr, "[PurchaseAudio] device-error operation=%s error=%s\n", operation, detail);
+        fflush(stderr);
+    }
+    bool open(unsigned frequency, unsigned channels) noexcept {
+        if (!(SDL_WasInit(SDL_INIT_AUDIO) & SDL_INIT_AUDIO)) {
+            report_failure("open", "audio-subsystem-unavailable");
+            return false;
+        }
+        SDL_AudioSpec desired{};
+        desired.freq = static_cast<int>(frequency);
+        desired.format = AUDIO_F32SYS;
+        desired.channels = static_cast<Uint8>(channels);
+        desired.samples = 512;
+        device = SDL_OpenAudioDevice(nullptr, 0, &desired, nullptr, 0);
+        if (!device) report_failure("open", SDL_GetError());
+        return device != 0;
+    }
+    size_t queued_bytes() const noexcept { return SDL_GetQueuedAudioSize(device); }
+    bool queue(std::span<const float> pcm) const noexcept {
+        const bool queued = SDL_QueueAudio(device, pcm.data(), static_cast<Uint32>(pcm.size_bytes())) == 0;
+        if (!queued) report_failure("queue", SDL_GetError());
+        return queued;
+    }
+    void start() const noexcept { SDL_PauseAudioDevice(device, 0); }
+    void close() noexcept { if (device) { SDL_CloseAudioDevice(device); device = 0; } }
+};
+workshop::purchase_audio0284::Player<PurchaseAudioDevice0284> purchase_audio0284;
+}
+bool workshop_purchase_sound0284() noexcept {
+    try {
+        const double volume = recompui::config::sound::get_main_volume();
+        const bool queued = purchase_audio0284.play(volume);
+        if (queued) {
+            fprintf(stderr, "[PurchaseAudio] queued backend=SDL frequency=44100 channels=2 frames=5292 bytes=42336 volumePercent=%.3f gain=%.6f\n",
+                    volume, workshop::purchase_audio0284::volume_gain(volume));
+            fflush(stderr);
+        }
+        return queued;
+    }
+    catch (...) { return false; }
+}
+#endif
+
 // --- Audio ----------------------------------------------------------------
 // Push-based playback: queue whatever the game hands us, report how much is
 // still queued. SDL converts from the game's sample rate to the device's.
 
 static SDL_AudioDeviceID audio_device = 0;
 static std::mutex audio_mutex;
+#ifdef YOSHI_WORKSHOP
+static bool book_audio_muted0310 = false; // Access only under audio_mutex.
+void workshop_menu_native_audio_gate0310(bool muted) noexcept {
+    std::lock_guard<std::mutex> lock(audio_mutex);
+    if (book_audio_muted0310 == muted) return;
+    book_audio_muted0310 = muted;
+    if (audio_device) {
+        SDL_PauseAudioDevice(audio_device, muted ? 1 : 0);
+        SDL_ClearQueuedAudio(audio_device);
+    }
+    fprintf(stderr, "[BookMusicGate0310] muted=%d native-queue=cleared\n", int(muted));
+    fflush(stderr);
+}
+#endif
 static constexpr uint32_t audio_channels = 2;
 static uint32_t game_frequency = 44100;
 
@@ -264,26 +334,30 @@ static bool open_audio_device(uint32_t frequency) {
         return false;
     }
 
+#ifdef YOSHI_WORKSHOP
+    SDL_PauseAudioDevice(audio_device, book_audio_muted0310 ? 1 : 0);
+#else
     SDL_PauseAudioDevice(audio_device, 0);
+#endif
     return true;
 }
 
 static void queue_samples(int16_t* audio_data, size_t sample_count) {
-    if (audio_device == 0) {
-        return;
-    }
-
-    // Each stereo frame is one 32-bit word in RDRAM, which is stored
-    // word-swapped, so the two 16-bit halves read back right-then-left.
+    const float scale = static_cast<float>(recompui::config::sound::get_main_volume() / 100.0) / 32768.0f;
+    std::lock_guard<std::mutex> lock(audio_mutex);
+    if (!audio_device) return;
+#ifdef YOSHI_WORKSHOP
+    // Check under the SAME mutex as the gate/clear, including callbacks that
+    // were already in flight when the book claimed native audio ownership.
+    if (book_audio_muted0310) return;
+#endif
+    // RDRAM word swapping stores each stereo frame as right-then-left.
     static std::vector<float> buffer;
     buffer.resize(sample_count);
-    float scale = static_cast<float>(recompui::config::sound::get_main_volume() / 100.0) / 32768.0f;
     for (size_t i = 0; i + 1 < sample_count; i += 2) {
         buffer[i + 0] = audio_data[i + 1] * scale;
         buffer[i + 1] = audio_data[i + 0] * scale;
     }
-
-    std::lock_guard<std::mutex> lock(audio_mutex);
     const size_t bytes_per_ms = game_frequency * audio_channels * sizeof(float) / 1000;
     const size_t queued_bytes = SDL_GetQueuedAudioSize(audio_device);
     if (queued_bytes > audio_hard_cap_ms * bytes_per_ms) {
@@ -291,17 +365,13 @@ static void queue_samples(int16_t* audio_data, size_t sample_count) {
         fflush(stdout);
         SDL_ClearQueuedAudio(audio_device);
     }
-    else if (queued_bytes > audio_soft_cap_ms * bytes_per_ms) {
-        return;
-    }
+    else if (queued_bytes > audio_soft_cap_ms * bytes_per_ms) return;
     SDL_QueueAudio(audio_device, buffer.data(), static_cast<Uint32>(sample_count * sizeof(float)));
 }
 
 static size_t get_frames_remaining() {
-    if (audio_device == 0) {
-        return 0;
-    }
     std::lock_guard<std::mutex> lock(audio_mutex);
+    if (!audio_device) return 0;
     size_t queued_frames = SDL_GetQueuedAudioSize(audio_device) / (audio_channels * sizeof(float));
     size_t headroom_frames = game_frequency / 60 * audio_headroom_vis;
     return queued_frames > headroom_frames ? queued_frames - headroom_frames : 0;
@@ -373,7 +443,12 @@ std::vector<recomp::GameEntry> supported_games = {
         // Cast through int32_t: addresses in gprs are sign-extended, as on
         // the real CPU, and the runtime's RDRAM macros rely on it.
         .entrypoint_address = (gpr)(int32_t)0x80000400u,
-        .entrypoint = recomp_entrypoint,
+        .entrypoint =
+#ifdef YOSHI_WORKSHOP
+            workshop_game_entrypoint0320,
+#else
+            recomp_entrypoint,
+#endif
         .on_init_callback =
 #ifdef YOSHI_WORKSHOP
             workshop_on_init,
@@ -573,6 +648,13 @@ int main(int argc, char** argv) {
         .message_queue_control = {}, // the runtime's defaults
     });
 
+#ifdef YOSHI_WORKSHOP
+    workshop::menu_music_session0310::shutdown();
+    workshop_menu_native_audio_gate0310(true);
+#endif
+#ifdef WORKSHOP_CONTENT_BUILD
+    purchase_audio0284.shutdown(); // std::_Exit below skips static destructors.
+#endif
     NFD_Quit();
 
     // The game's threads are never joined by the runtime and may still be

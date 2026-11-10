@@ -1,0 +1,48 @@
+{
+  "version": "0.34.0-beta.1",
+  "status": "public experimental prerelease",
+  "originalRomIncluded": false,
+  "freshProgression": true,
+  "volumePercent": 3,
+  "windows": {
+    "engineVersion": "0.33.0",
+    "engineRebuilt": false,
+    "engineSha256": "8163acd89a22865616d2cb074af5a9d88db1846effb1c5eb76080b8ffd4b95af",
+    "archiveSha256": "3a1743501ea60321c7f786ebfff905989463b9d696a2a78fdb02bb497f6b7dbd",
+    "packageChecks": 153,
+    "expectedRejections": 7,
+    "realRomImportsThreeByteOrders": true,
+    "launcherRouteTests": "Synthetic child processes only; no game launched for repackaging",
+    "workshopSelfContained": true,
+    "workshopSourceFilesCompared": 56,
+    "manualNewStoryHardAndEditorPlaythroughPending": true
+  },
+  "linux": {
+    "engineVersion": "0.34.0",
+    "archiveSha256": "735963412395906509878fae05a40232bc11571921e10bdefaea070506a8b7e7",
+    "nativeCpuChecks": 45038,
+    "atelierChecks": 814,
+    "nativeBuildPassed": true,
+    "exactMusicPcmWaveMatchWindows": true,
+    "threeELFDependencyAuditPassedOnUbuntu2204": true,
+    "standaloneWorkshopApiTested": true,
+    "gameplayValidated": false,
+    "nativeLevelEntryVerified": false,
+    "softwareWslIntroTests": "FAILED:11/13 native frames, no playable Yoshi",
+    "mint223HardwareTested": false,
+    "noFurtherHeavyTestsRequested": true
+  },
+  "sourceReconstruction": {
+    "baseGeneratedFiles": 219,
+    "nativeHookPatchFiles": 51,
+    "allFinalGeneratedFilesMatchReleaseAfterNewlineNormalization": true,
+    "audioMicrocodeMatchesPreparedContent": true,
+    "originalRomCopyIntoPublicTree": false,
+    "fullNativeSourceRebuildForThisPublication": false
+  },
+  "coopAndBossBattle": "Incomplete and deferred; not advertised as finished",
+  "hardStory": "Integrated; public gate remains locked because Boss wins for all16 are unavailable",
+  "stableReleaseCertification": false,
+  "personalProfileModified": false,
+  "notes": "Automated checks are bounded and do not replace complete manual playthroughs. This is a prerelease, not a completed project."
+}
