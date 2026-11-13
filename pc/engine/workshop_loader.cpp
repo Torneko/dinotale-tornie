@@ -30,6 +30,8 @@ extern "C" void workshop_request_native_history_test(unsigned);
 #include "elemental_native0355.hpp"
 #include "elemental_contact0355.hpp"
 #include "elemental_tongue0355.hpp"
+#include "elemental_egg_draw0363.hpp"
+#include "enemy_egg_provenance0366.hpp"
 #include "elemental_flame_food0355.hpp"
 #include "elemental_lava0355.hpp"
 #include "elemental_selection_capacity0355.hpp"
@@ -864,7 +866,7 @@ extern "C" void workshop_progress_read_end(uint8_t* rdram,recomp_context*){
     workshop::hybrid_mode::records_loaded(rdram,progress_payload);progress_payload=0;
 }
 extern "C" int workshop_hybrid_records_save(uint8_t* rdram,recomp_context* ctx){return workshop::hybrid_mode::records_saving(rdram,uint32_t(MEM_W(0x20,ctx->r29)),0x800F97F8);}
-extern "C" int workshop_hybrid_active(){return workshop::hybrid_mode::active();}
+extern "C" int workshop_hybrid_active(){return workshop::hybrid_mode::lucky_override_active();}
 extern "C" unsigned workshop_hybrid_lucky_type(){return workshop::hybrid_mode::lucky_type();}
 extern "C" unsigned workshop_hybrid_lucky_object(){return workshop::hybrid_mode::lucky_object();}
 extern "C" void workshop_hybrid_recolor(uint8_t* rdram,recomp_context* ctx){if(ctx->r2==1)workshop::hybrid_mode::recolored(rdram,uint32_t(ctx->r16));}
@@ -1144,7 +1146,7 @@ extern "C" void workshop_mix_level(uint8_t* rdram,recomp_context* ctx){
         if(preload_custom_fruits){const auto saved=*ctx;for(unsigned i=0;i<6;i++){ctx->r4=0x4F00+i;func_80051368(rdram,ctx);}*ctx=saved;}
         return;
     }
-    const unsigned threshold=workshop::hybrid_mode::active()?45:15;
+    const unsigned threshold=workshop::hybrid_mode::fruit_threshold();
     const auto stats=hybrid_visits.apply(rdram,uint32_t(ctx->r19),hybrid_room,[](){return hybrid_random().ticket();},threshold);
     const auto saved=*ctx;
     for(unsigned i=0;i<6;i++){ctx->r4=0x4F00+i;func_80051368(rdram,ctx);}
@@ -1177,9 +1179,9 @@ extern "C" uint32_t workshop_mix_spawn(uint8_t* rdram,recomp_context* ctx){
     const uint32_t parent=ram_pointer(uint32_t(ctx->r17))?uint32_t(MEM_W(0,ctx->r17)):0;
     const bool preview=ram_pointer(parent) && workshop::fruit_mix::preview_source(MEM_HU(12,int32_t(parent)));
     const auto result=preview?(hybrid_visits.actors.contains(parent)
-        ?hybrid_visits.pick(id,parent,[](){return hybrid_random().ticket();},workshop::hybrid_mode::active()?45:15)
-        :hybrid_spawn_choices.pick(id,parent,[](){return hybrid_random().ticket();},workshop::hybrid_mode::active()?45:15))
-        :workshop::fruit_mix::replacement(id,hybrid_random().ticket(),workshop::hybrid_mode::active()?45:15);
+        ?hybrid_visits.pick(id,parent,[](){return hybrid_random().ticket();},workshop::hybrid_mode::fruit_threshold())
+        :hybrid_spawn_choices.pick(id,parent,[](){return hybrid_random().ticket();},workshop::hybrid_mode::fruit_threshold()))
+        :workshop::fruit_mix::replacement(id,hybrid_random().ticket(),workshop::hybrid_mode::fruit_threshold());
     if(result!=id)fprintf(stderr,"[Workshop] Hybrid replacement %04X -> %04X.\n",id,result);
     return result;
 }
@@ -1572,13 +1574,14 @@ extern "C" void workshop_trace_entry(uint8_t* rdram,recomp_context* ctx,const ch
     // The separate F070 state machine is used by another native coin form.
     if(std::string_view(name)=="func_8006F49C" && (uint32_t(ctx->r6)&255)==3)
         workshop::collections::collect(rdram,uint32_t(ctx->r4));
+    if(std::string_view(name)=="workshop_8003B8C8")workshop::elemental_egg_draw0363::palette_offset(rdram,ctx,elemental_solo_scope0355());
     if(std::string_view(name)=="func_8006E7F0" || std::string_view(name)=="func_8005F700")workshop::collections::draw(rdram,uint32_t(ctx->r4));
     if(std::string_view(name)=="func_8006E7F0" || std::string_view(name)=="func_8005F700")workshop::reward_popup::paint(rdram,uint32_t(ctx->r4));
     if(fruit_audit && std::string_view(name)=="func_8005F700" && workshop::reward_popup::fours.contains(uint32_t(ctx->r4))){
         static uint32_t previous=0;
         if(previous!=uint32_t(ctx->r4)){previous=uint32_t(ctx->r4);fprintf(stderr,"[RewardPopup] draw single-four actor=%08X textureFrame=%u resource=%08X\n",previous,unsigned(MEM_HU(0x144,ctx->r4)),uint32_t(MEM_W(0x168,ctx->r4)));}
     }
-    if(std::string_view(name)=="func_8005F700"){workshop::editor_objects::paint(rdram,uint32_t(ctx->r4));if(story_hard_session0330())workshop::story_hard_bridge0330::paint(rdram,uint32_t(ctx->r4));}
+    if(std::string_view(name)=="func_8005F700" || std::string_view(name)=="func_8006E7F0"){workshop::elemental_egg_draw0363::paint(rdram,uint32_t(ctx->r4),elemental_solo_scope0355());workshop::editor_objects::paint(rdram,uint32_t(ctx->r4));if(story_hard_session0330())workshop::story_hard_bridge0330::paint(rdram,uint32_t(ctx->r4));}
     if(std::string_view(name)=="func_8005F700")workshop::hybrid_mode::paint(rdram,uint32_t(ctx->r4));
     if(std::string_view(name)=="func_800675F0"){
         workshop::passages::frame(rdram,ctx);
@@ -1838,21 +1841,14 @@ extern "C" int workshop_egg_bubble_gate(uint8_t* rdram,recomp_context* ctx){
     return 0;
 }
 extern "C" void workshop_egg_enemy_color(uint8_t* rdram,recomp_context* ctx){
-    const auto color=uint32_t(MEM_W(0,int32_t(0x807F0008)));
-    if(workshop::yoshi_colors0300::extended(color))return;
-    if(color==6 || color==7 || !workshop::rewards::custom_enemy_variant)return;
-    if(auto variant=workshop::rewards::custom_enemy_variant(uint32_t(ctx->r5));variant && *variant<6)
-        MEM_W(0x10,ctx->r29)=8+*variant;
+    workshop::enemy_egg_provenance0366::enemy_stack(rdram,ctx,workshop::rewards::custom_enemy_variant);
 }
 extern "C" void workshop_egg_default_color(uint8_t* rdram,recomp_context* ctx){
     if(!ctx->r2)return;
     const auto color=uint32_t(MEM_W(0,int32_t(0x807F0008)));
     if(workshop::yoshi_colors0300::elemental(color)){ctx->r7=workshop::yoshi_colors0300::native_alias(color);return;}
+    if(workshop::enemy_egg_provenance0366::default_color(rdram,ctx,workshop::rewards::custom_enemy_variant))return;
     if(workshop::yoshi_colors0300::metal(color)){ctx->r7=color;return;}
-    if(color!=6 && color!=7 && workshop::rewards::custom_enemy_variant){
-        const auto source=uint32_t(MEM_W(0x24,ctx->r29));
-        if(auto variant=workshop::rewards::custom_enemy_variant(source);variant && *variant<6){ctx->r7=8+*variant;return;}
-    }
     if(color>=8 && color<14)ctx->r7=color;
 }
 // Entered at the existing food bridge with the native parent stack intact.

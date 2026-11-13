@@ -11,7 +11,11 @@ bool readable();
 bool saved();
 // Story Hybrid shares content, but keeps its own native Story score table.
 // Existing one-argument callers retain the Hybrid Trial record bank.
-void activate(bool value,bool use_hybrid_trial_records=true);
+void activate(bool value,bool use_hybrid_trial_records=true,bool story_hard=false);
+// Hard Story mixes ordinary/hybrid content with its own per-level Lucky
+// decision, while keeping the Hybrid Trial record bank separate.
+unsigned fruit_threshold();
+bool lucky_override_active();
 void custom_placements(std::span<const uint8_t> payload);
 bool active();
 void initialize_ram(uint8_t* rdram);

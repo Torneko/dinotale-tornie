@@ -14,6 +14,10 @@ inline constexpr std::array<std::array<uint16_t,3>,4> choices{{
     {0x4F01,0x4F02,0x4F05}  // grapes: blackberry, blueberry, kiwi
 }};
 constexpr bool eligible(uint16_t id){return id>=0x4030 && id<=0x4033;}
+constexpr unsigned content_threshold(bool hybrid,bool story_hard){return story_hard?30:hybrid?45:15;}
+// Independent uniform sixty-way tickets keep the two Lucky families equally
+// likely while distributing their four/six colors uniformly.
+constexpr unsigned hard_lucky_choice(unsigned family_ticket,unsigned color_ticket){return family_ticket<30?6+color_ticket%6:color_ticket%4;}
 constexpr uint16_t replacement(uint16_t id,unsigned ticket,unsigned threshold=15){
     return eligible(id) && ticket<threshold?choices[id-0x4030][ticket%3]:id;
 }

@@ -18,6 +18,8 @@ enum class Phase {Empty,Active,Lost,Won,Abandoned};
 // Production accepts only the confirmed vanilla-like survivor rule.
 enum class CompletionPolicy {Undecided,SurvivingRecruits,AllSixWorlds}; // Last value is rejected.
 using Checkpoint=std::array<uint8_t,14>;
+// Four original Black/White sources, independent of the Warp4 recruit.
+inline constexpr std::array<unsigned,4> extra_egg_levels{4,7,9,10};
 struct Run {
  std::string token;
  uint64_t serial=0;
@@ -25,10 +27,11 @@ struct Run {
  unsigned owned=0,found=0,alive=0,ever_lost=0,worlds=0,claimed_levels=0;
  std::array<unsigned,18> yoshi_worlds{};
  std::array<unsigned,24> egg_choice{};
+ std::array<unsigned,4> extra_egg_choice{};unsigned claimed_extra=0;
  std::array<unsigned,6> world_levels{};
  bool checkpoint_bound=false;
  Checkpoint checkpoint{};
- Run(){egg_choice.fill(unassigned);world_levels.fill(unassigned);}
+ Run(){extra_egg_choice.fill(unassigned);egg_choice.fill(unassigned);world_levels.fill(unassigned);}
  bool operator==(const Run&)const=default;
 };
 struct View {
@@ -59,6 +62,8 @@ public:
  bool reserve_elemental(unsigned level,unsigned color,const std::string& token,bool trusted_entry);
  std::optional<unsigned> egg_for(unsigned level,const std::string& token,bool trusted_entry);
  bool found_egg(unsigned level,unsigned color,const std::string& token,bool trusted_carry_finish);
+ std::optional<unsigned> extra_egg_for(unsigned slot,const std::string& token,bool trusted_entry);
+ bool found_extra_egg(unsigned slot,unsigned color,const std::string& token,bool trusted_carry_finish);
  bool lose_yoshi(unsigned color,const std::string& token,bool trusted_death);
  bool restore_yoshi(unsigned color,const std::string& token,bool trusted_rescue);
  bool world_finished(unsigned level,const std::string& token,bool trusted_receipt);
@@ -75,6 +80,8 @@ bool resume_run(const std::string&,std::span<const uint8_t>,bool native_continui
 bool reserve_elemental(unsigned,unsigned,const std::string&,bool trusted_entry);
 std::optional<unsigned> egg_for(unsigned,const std::string&,bool trusted_entry);
 bool found_egg(unsigned,unsigned,const std::string&,bool trusted_carry_finish);
+std::optional<unsigned> extra_egg_for(unsigned,const std::string&,bool trusted_entry);
+bool found_extra_egg(unsigned,unsigned,const std::string&,bool trusted_carry_finish);
 bool lose_yoshi(unsigned,const std::string&,bool trusted_death);
 bool restore_yoshi(unsigned,const std::string&,bool trusted_rescue);
 bool world_finished(unsigned,const std::string&,bool trusted_receipt);

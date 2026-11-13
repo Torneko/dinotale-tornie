@@ -739,7 +739,7 @@ void launch_native(int mode){
 
     session_mode.store(mode);
 
-    workshop::hybrid_mode::activate(workshop::game_modes0320::hybrid_content(mode),workshop::game_modes0320::hybrid_trial_records(mode));
+    workshop::hybrid_mode::activate(workshop::game_modes0320::hybrid_content(mode),workshop::game_modes0320::hybrid_trial_records(mode),mode==workshop::game_modes0320::StoryHard);
     if(mode!=5)workshop::story_hybrid0320::deactivate();
 
     workshop::achievements::start_session(unsigned(mode));

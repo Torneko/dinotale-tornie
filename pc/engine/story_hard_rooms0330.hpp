@@ -25,7 +25,8 @@ struct Plan {
  // Existing page presence is not proof of a safe floor or lack of occlusion.
  bool floor_or_occlusion_certified=false;
 };
-struct Applied {std::vector<uint8_t> rom;std::array<Plan,24> plans{};size_t allocation_end=allocation_start;};
+struct ExtraEggSource {unsigned level=24,room=177;uint32_t packed=0,x=0,y=0;unsigned slot=255;};
+struct Applied {std::vector<uint8_t> rom;std::array<Plan,24> plans{};size_t allocation_end=allocation_start;std::vector<ExtraEggSource> extra_eggs;};
 // Pure in-memory ROM transform. Adds one native4692 question-bubble record per
 // course, preserves every original object and all shared/canonical progression.
 // The caller supplies its already validated USA source and owns mode6 gating.

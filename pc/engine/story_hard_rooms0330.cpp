@@ -46,14 +46,20 @@ Anchor final_entry(std::span<const uint8_t> rom,const navigation::Source& native
  require(found.has_value(),"Hard final room has no proven native arrival");return *found;
 }
 void preload(std::span<const uint8_t> original,std::vector<uint8_t>& output,size_t header){
- size_t end=0;unsigned pool=0,bubble=0;
- for(size_t off=0x60;off<0x100;off+=2){const auto kind=u16(original,off);if(kind==0xFFFF){end=off;break;}pool+=kind==0x401D;bubble+=kind==0x4692;}
- require(end&&pool==1&&bubble<=1,"Hard native preload list incompatible");
- if(bubble)return;
- require(end+4<0x100&&u16(original,end+2)==0,"Hard preload padding unavailable");
- // The copied header is byte-identical apart from this appended resource and
- // its new terminator.401D is already listed once and remains unchanged.
- half(output,header+end,0x4692);half(output,header+end+2,0xFFFF);
+ size_t end=0;unsigned pool=0,bubble=0,wrapper=0;
+ for(size_t off=0x60;off<0x100;off+=2){const auto kind=u16(original,off);if(kind==0xFFFF){end=off;break;}pool+=kind==0x401D;bubble+=kind==0x4692;wrapper+=kind==0x41CE;}
+ require(end&&pool==1&&bubble<=1&&wrapper<=1,"Hard native preload list incompatible");
+ //4692 creates a41CE wrapper before it can release its401D egg. Some native
+ // courses do not preload that wrapper; all three dependencies must exist.
+ const std::array<uint16_t,2> dependencies{0x41CE,0x4692};
+ std::array<uint16_t,2> missing{};unsigned count=0;
+ if(!wrapper)missing[count++]=dependencies[0];if(!bubble)missing[count++]=dependencies[1];
+ if(!count)return;
+ require(end+size_t(count+1)*2<=0x100,"Hard preload padding unavailable");
+ for(unsigned i=1;i<=count;++i)require(u16(original,end+i*2)==0,"Hard preload padding unavailable");
+ // Preserve every original entry and its order; append only absent resources.
+ for(unsigned i=0;i<count;++i)half(output,header+end+i*2,missing[i]);
+ half(output,header+end+count*2,0xFFFF);
 }
 }
 Applied apply(std::span<const uint8_t> original){
@@ -62,6 +68,11 @@ Applied apply(std::span<const uint8_t> original){
  const auto bank4=u32(original,0xA79D4+16);require(bank4>0&&bank4<allocation_start,"Hard bank4 base invalid");
  auto pointer=[&](size_t at){require(at>=bank4&&at<allocation_limit&&at-bank4<=0xFFFFFF,"Hard bank4 pointer overflow");return 0x04000000u|uint32_t(at-bank4);};
  navigation::Source native(original);Applied result;result.rom.assign(original.begin(),original.end());size_t cursor=allocation_start;
+ std::array<unsigned,4> extra_counts{};constexpr std::array<unsigned,4> extra_levels{4,7,9,10};
+ for(unsigned course=0;course<24;++course)for(unsigned id:vanilla_rooms[course])if(id<177)for(const auto& item:native.objects(id))if(item.packed>>16==0x4692||item.packed>>16==0x4693){
+  auto slot=std::find(extra_levels.begin(),extra_levels.end(),course);require(slot!=extra_levels.end(),"Unexpected original Hard Black/White source course");const auto index=unsigned(slot-extra_levels.begin());++extra_counts[index];result.extra_eggs.push_back({course,id,item.packed,item.x,item.y,index});
+ }
+ require(std::all_of(extra_counts.begin(),extra_counts.end(),[](unsigned n){return n==1;}),"Hard requires four unique original Black/White sources");
  for(unsigned level=0;level<24;++level){
   std::optional<Anchor> anchor;unsigned warp_count=0;
   for(unsigned id:vanilla_rooms[level])if(id<177){const auto r=room(original,id);for(unsigned i=0;i<r.count;++i)if(u16(original,r.objects+size_t(i)*12)==0x450A){++warp_count;anchor=placement(original,id,r,i,AnchorKind::Warp4);}}
@@ -70,10 +81,14 @@ Applied apply(std::span<const uint8_t> original){
   require(navigation::coordinate(anchor->x)&&navigation::coordinate(anchor->y),"Hard anchor coordinate invalid");
   const auto source=room(original,anchor->room);require(source.count<149,"Hard appended bubble exceeds native149-object cap");
   const float ax=std::bit_cast<float>(anchor->x),ay=std::bit_cast<float>(anchor->y);
-  //5-3 enters atY504 along the top of its existing page. Put its bubble
-  //40units below that entrance; all23 Warp4 anchors use the40unit rise.
+  // Native worldY grows downward. Raise all24 added sources64 units;
+  // the former positive offset could release the egg below its platform.
+  // Four right-offset sites intersect existing walls/ceilings at this height:
+  // use their unchanged Warp4 column instead. Original Black/White sources,
+  // collision geometry and native egg release/motion remain untouched.
   const bool elemental_end=level==5||level==11;
-  uint32_t x=std::bit_cast<uint32_t>(ax+(elemental_end?-56.0f:32.0f)),y=std::bit_cast<uint32_t>(ay+(level==18?-40.0f:elemental_end?24.0f:40.0f));
+  const bool anchor_column=level==6||level==14||level==19||level==20;
+  uint32_t x=std::bit_cast<uint32_t>(ax+(anchor_column?0.0f:elemental_end?-56.0f:32.0f)),y=std::bit_cast<uint32_t>(ay+(level==18?-104.0f:elemental_end?-40.0f:-24.0f));
   if(!native.within_terrain(anchor->room,{x,y}))x=std::bit_cast<uint32_t>(ax-32.0f);
   require(navigation::coordinate(x)&&navigation::coordinate(y)&&native.within_terrain(anchor->room,{x,y}),"Hard bubble must remain inside an existing terrain page");
   const size_t objects=align16(cursor),meta=align16(objects+size_t(source.count+1)*12),header=align16(meta+12),end=align16(header+0x118);

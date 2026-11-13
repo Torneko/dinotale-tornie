@@ -21,10 +21,13 @@ Bytes recolor(const Bytes& palette,bool aquatic){
   const std::array<unsigned,3> target=boots?(aquatic?std::array<unsigned,3>{25,26,28}:std::array<unsigned,3>{31,29,2}):belly?(aquatic?std::array<unsigned,3>{18,29,31}:std::array<unsigned,3>{8,7,8}):aquatic?std::array<unsigned,3>{3,20,31}:std::array<unsigned,3>{31,13,2};
   const auto scale=[&](unsigned channel){return (v*channel+15)/31;};half(result,i*2,uint16_t((scale(target[0])<<11)|(scale(target[1])<<6)|(scale(target[2])<<1)|(c&1)));
  }
+ // Oral red texels share this row with dorsal spikes; both intentionally follow
+ // the elemental tongue. Warm boot highlights188/195/206 are outside this span.
+ for(unsigned i=212;i<=243;++i)half(result,i*2,tongue_color(be16(result,i*2),aquatic?water:fire));
  return result;
 }
 Bytes append_players(const Bytes& original){need(original.size()==16*512,"Elemental pack needs sixteen player palettes");Bytes result=original;const Bytes green(original.begin(),original.begin()+512);for(bool aquatic:{false,true}){auto palette=recolor(green,aquatic);result.insert(result.end(),palette.begin(),palette.end());}return result;}
-Bytes append_eggs(const Bytes& original,bool extra){const unsigned count=extra?17:16;need(original.size()==count*512,"Elemental pack needs known egg palette count");Bytes result=original;for(unsigned alias:{7u,6u}){const unsigned index=alias+(extra?1:0);result.insert(result.end(),original.begin()+index*512,original.begin()+(index+1)*512);}return result;}
+Bytes append_eggs(const Bytes& original,bool extra){const unsigned count=extra?17:16;need(original.size()==count*512,"Elemental pack needs known egg palette count");Bytes result=original;for(unsigned color:{fire,water}){const unsigned index=extra?1:0;Bytes row(original.begin()+index*512,original.begin()+(index+1)*512);for(unsigned i=0;i<256;++i)half(row,i*2,egg_color(be16(row,i*2),color));result.insert(result.end(),row.begin(),row.end());}return result;}
 }
 std::vector<uint8_t> apply(std::vector<uint8_t> rom){
  need(rom.size()==0x1000000,"Elemental resources must precede appended terrain");need(be32(rom,0xA79D4+12)==bank3_base,"Unexpected elemental bank");
@@ -40,6 +43,13 @@ std::vector<uint8_t> apply(std::vector<uint8_t> rom){
  const auto transition_new=append_players(block(rom,be32(rom,transition+0x30)));
  need(block(rom,be32(rom,castle.a+0x30))==player_old&&block(rom,be32(rom,rescue.a+0x30))==player_old,"Castle/rescue palette prefixes differ");
  const auto tongue_pointer=be32(rom,tongue.a+0x30);need(tongue_pointer==be32(rom,tongue_body.a+0x30),"Tongue body/tip palettes unexpectedly differ");const auto tongue_old=block(rom,tongue_pointer);need(tongue_old.size()==512,"Unexpected original tongue palette count");uint32_t tongue_hash=2166136261u;for(auto v:tongue_old)tongue_hash=(tongue_hash^v)*16777619u;need(tongue_hash==original_tongue_fnv,"Original classic red tongue palette changed");Bytes tongue_new=tongue_old;for(unsigned color:{fire,water}){Bytes row=tongue_old;for(unsigned i=0;i<256;++i)half(row,i*2,tongue_color(be16(row,i*2),color));tongue_new.insert(tongue_new.end(),row.begin(),row.end());}put(rom,tongue_at,tongue_new);descriptor(rom,bank(rom,tongue_pointer),tongue_at,tongue_new.size());
+ // Castle factories use native White/Black actor aliases for extended colours.
+ // Their original single-row resources must retain row0 for classic actors while
+ // exposing the full display-index range used by the existing palette wrapper.
+ for(unsigned alias:{6u,7u}){const auto a=object(rom,0x4656+alias);const auto info=bank(rom,be32(rom,a.a+0x30));const auto original=block(rom,be32(rom,a.a+0x30));
+  need(original.size()==512&&std::equal(original.begin(),original.end(),player_old.begin()+alias*512),"Unexpected native castle alias palette");
+  Bytes rows=player_new;std::copy(original.begin(),original.end(),rows.begin());const size_t at=0xFDAB00+(alias-6)*18*512;put(rom,at,rows);descriptor(rom,info,at,rows.size());
+ }
  put(rom,player_at,player_new);put(rom,egg_at,egg_new);put(rom,egg_extra_at,extra_new);put(rom,transition_at,transition_new);word(rom,player.a+0x28,ptr(player_at));
  for(const auto& item:std::array<std::array<size_t,3>,5>{{{egg.a,egg_at,18*512},{extra.a,egg_extra_at,19*512},{castle.a,player_at,18*512},{rescue.a,player_at,18*512},{transition,transition_at,18*512}}})descriptor(rom,bank(rom,be32(rom,item[0]+0x30)),item[1],item[2]);
  for(unsigned n=0;n<2;++n){const size_t a=n?water_object:fire_object,info=n?water_info:fire_info;const uint16_t id=n?water_selection_id:fire_selection_id;
