@@ -132,6 +132,17 @@ bool acquire(unsigned pc_color){
     if(!bit||!search_scope()||!current.initialized||!current.readable||(!(data.found&bit)&&!completion_ready()))return false;
     return update(Action::Acquire,bit);
 }
+bool confirm_owned(unsigned pc_color){
+    std::lock_guard guard(mutex);const auto bit=yoshi_colors0300::metal_bit(pc_color);
+    if(!bit||!search_scope()||!current.initialized||!current.readable||!(data.found&bit))return false;
+    try{
+        FileLock lock(filename);bool found=false;Data before;
+        try{before=read_disk(false,found);}catch(...){current.readable=false;throw;}
+        data=before;present=found;publish();
+        if(!(before.found&bit)){current.reason="metal-recovery-not-owned";return false;}
+        current.saved=true;current.reason.clear();return true;
+    }catch(const std::exception& error){current.saved=false;current.reason=error.what();fprintf(stderr,"[MetalYoshi] recovery preserved reason=%s\n",error.what());return false;}
+}
 bool save_story_alive(unsigned bits){std::lock_guard guard(mutex);return bits<=3&&scope&&session==0&&update(Action::StoryLives,bits);}
 bool restore_life(unsigned pc_color){
     std::lock_guard guard(mutex);const auto bit=yoshi_colors0300::metal_bit(pc_color);

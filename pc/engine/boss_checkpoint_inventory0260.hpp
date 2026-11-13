@@ -1,5 +1,6 @@
 #pragma once
 #include "boss_native.hpp"
+#include "yoshi_colors0300.hpp"
 #include <array>
 #include <cstdint>
 #include <bit>
@@ -19,7 +20,7 @@ using Scale=std::array<uint32_t,3>;
 // animate, while4005 and a subsequently thrown4002 inherit saved78.
 struct Egg {uint16_t kind=0;unsigned palette=0;Scale saved_scale{};bool operator==(const Egg&)const=default;};
 struct Payload {
- unsigned activation_vi=0;uint32_t player=0;unsigned native_color=8,pc_color=14,hp=0,count=0;
+ unsigned activation_vi=0;uint32_t player=0;unsigned native_color=8,pc_color=18,hp=0,count=0;
  std::array<Egg,6> eggs{};
  bool operator==(const Payload&)const=default;
 };
@@ -48,7 +49,7 @@ inline bool stage_scale(uint8_t* rdram,uint32_t address,const Scale& scale){
 }
 inline bool same_player(uint8_t* ram,const Payload& p){
  return ram&&n::actor(ram,p.player,0x4001)&&n::word(ram,0x800F8828)==p.player&&
-        p.pc_color<14&&p.native_color==(p.pc_color<8?p.pc_color:0)&&
+        p.pc_color<18&&p.native_color==(yoshi_colors0300::native_alias(p.pc_color))&&
         n::word(ram,0x800F8DB0)==p.native_color&&n::word(ram,0x807F0008)==p.pc_color;
 }
 // Includes portable native objects recognised by3F894, to avoid silently treating
@@ -76,15 +77,15 @@ inline bool read(uint8_t* ram,uint32_t player,Inventory& out){
   for(unsigned j=0;j<20;j++)if(n::word(ram,player+0x188+j*4)==a)++references;
   if(references!=1)return false;
   const auto palette=kind==0x4004?n::word(ram,a+0x1EC):0;
-  if(kind==0x4004&&palette>=14)return false;
+  if(kind==0x4004&&palette>18)return false;
   Scale saved{};if(kind==0x4004&&!read_scale(ram,a,saved))return false;
   result.actors[i]=a;result.eggs[i]={uint16_t(kind),palette,saved};
  }
  out=result;return true;
 }
 inline bool valid(const Payload& p){
- if(!p.activation_vi||!pointer(p.player,0x1FC)||p.pc_color>=14||p.native_color!=(p.pc_color<8?p.pc_color:0)||p.hp>8||p.count>6)return false;
- for(unsigned i=0;i<p.count;i++)if(p.eggs[i].kind!=0x4004||p.eggs[i].palette>=14||!valid_scale(p.eggs[i].saved_scale))return false;
+ if(!p.activation_vi||!pointer(p.player,0x1FC)||p.pc_color>=18||p.native_color!=(yoshi_colors0300::native_alias(p.pc_color))||p.hp>8||p.count>6)return false;
+ for(unsigned i=0;i<p.count;i++)if(p.eggs[i].kind!=0x4004||p.eggs[i].palette>18||!valid_scale(p.eggs[i].saved_scale))return false;
  for(unsigned i=p.count;i<p.eggs.size();i++)if(p.eggs[i]!=Egg{})return false;
  return true;
 }

@@ -166,7 +166,7 @@ text = "workshop_pause_hide(rdram,ctx);"
 [[patches.hook]]
 func = "func_807BA478"
 before_vram = 0x807BA4E0
-text = "{ uint32_t color=MEM_W(0,(gpr)(int32_t)0x807F0008); if(color<16)ctx->r25=color; }"
+text = "{ uint32_t color=MEM_W(0,(gpr)(int32_t)0x807F0008); if(color<18)ctx->r25=color; }"
 
 [[patches.hook]]
 func = "func_8002B088"
@@ -306,31 +306,31 @@ text = "if(workshop_special_victory(rdram,ctx))return;"
 [[patches.instruction]]
 func = "func_80050C8C"
 vram = 0x80050C94
-value = 0x2D090008
+value = 0x2D09000B
 [[patches.instruction]]
 func = "func_804A0548"
 vram = 0x804A0584
-value = 0x2405004C
+value = 0x24050054
 [[patches.instruction]]
 func = "func_804A0610"
 vram = 0x804A0628
-value = 0x2409000F
+value = 0x24090011
 [[patches.instruction]]
 func = "func_804A0954"
 vram = 0x804A096C
-value = 0x2409000F
+value = 0x24090011
 [[patches.instruction]]
 func = "func_804A0C98"
 vram = 0x804A0CB0
-value = 0x2409000F
+value = 0x24090011
 [[patches.instruction]]
 func = "func_804A0FDC"
 vram = 0x804A0FF4
-value = 0x2409000F
+value = 0x24090011
 [[patches.instruction]]
 func = "func_804A1404"
 vram = 0x804A1454
-value = 0x24030010
+value = 0x24030012
 [[patches.instruction]]
 func = "workshop_804A4AE0"
 vram = 0x804A4AFC
@@ -338,7 +338,7 @@ value = 0x00000000
 [[patches.hook]]
 func = "workshop_804A4AE0"
 before_vram = 0x804A4AFC
-text = "ctx->r15 = ctx->r15 == 14 ? 6 : ctx->r15 == 15 ? 7 : 0;"
+text = "ctx->r15 = ctx->r15 == 14 ? 6 : ctx->r15 == 15 ? 7 : ctx->r15 == 16 ? 7 : ctx->r15 == 17 ? 6 : 0;"
 [[patches.instruction]]
 func = "func_8057D750"
 vram = 0x8057D760
@@ -346,7 +346,7 @@ value = 0x00000000
 [[patches.hook]]
 func = "func_8057D750"
 before_vram = 0x8057D760
-text = "ctx->r24 = MEM_HU(0, ADD32(S32(0x807FD200u), ctx->r15));"
+text = "ctx->r24 = MEM_HU(0, ADD32(S32(0x807FD300u), ctx->r15));"
 [[patches.instruction]]
 func = "func_8057D750"
 vram = 0x8057D798
@@ -354,7 +354,7 @@ value = 0x00000000
 [[patches.hook]]
 func = "func_8057D750"
 before_vram = 0x8057D798
-text = "ctx->r5 = MEM_W(0, ADD32(S32(0x807FD220u), ctx->r2));"
+text = "ctx->r5 = MEM_W(0, ADD32(S32(0x807FD330u), ctx->r2));"
 [[patches.instruction]]
 func = "func_8057D750"
 vram = 0x8057D7A0
@@ -362,15 +362,15 @@ value = 0x00000000
 [[patches.hook]]
 func = "func_8057D750"
 before_vram = 0x8057D7A0
-text = "ctx->r6 = MEM_W(0, ADD32(S32(0x807FD260u), ctx->r2));"
+text = "ctx->r6 = MEM_W(0, ADD32(S32(0x807FD380u), ctx->r2));"
 [[patches.instruction]]
 func = "func_8057D7D0"
 vram = 0x8057D824
-value = 0x2A010010
+value = 0x2A010012
 [[patches.instruction]]
 func = "func_8057D7D0"
 vram = 0x8057D8A8
-value = 0x2A010010
+value = 0x2A010012
 [[patches.instruction]]
 func = "func_807C36B8"
 vram = 0x807C37E8
@@ -378,11 +378,11 @@ value = 0x00000000
 [[patches.hook]]
 func = "func_807C36B8"
 before_vram = 0x807C37E8
-text = "ctx->r11 = MEM_W(0, ADD32(S32(0x807FD2A0u), ctx->r10));"
+text = "ctx->r11 = MEM_W(0, ADD32(S32(0x807FD3D0u), ctx->r10));"
 [[patches.instruction]]
 func = "workshop_807F1800"
 vram = 0x807F1828
-value = 0x2D290008
+value = 0x2D29000A
 [[patches.instruction]]
 func = "func_800409F0"
 vram = 0x80040A10
@@ -390,11 +390,11 @@ value = 0x24040010
 [[patches.instruction]]
 func = "workshop_ext_rescue_picker"
 vram = 0x807F3B38
-value = 0x27BDFF90
+value = 0x27BDFF80
 [[patches.instruction]]
 func = "workshop_ext_rescue_picker"
 vram = 0x807F3BA0
-value = 0x24070008
+value = 0x2407000A
 [[patches.instruction]]
 func = "workshop_ext_rescue_picker"
 vram = 0x807F3C04
@@ -406,15 +406,15 @@ text = "MEM_W(0X0, ctx->r14) = 6;"
 [[patches.instruction]]
 func = "workshop_ext_rescue_picker"
 vram = 0x807F3C38
-value = 0x24020010
+value = 0x24020012
 [[patches.instruction]]
 func = "workshop_ext_rescue_picker"
 vram = 0x807F3C84
-value = 0x27BD0070
+value = 0x27BD0080
 [[patches.instruction]]
 func = "workshop_807F1C00"
 vram = 0x807F1C14
-value = 0x2C490010
+value = 0x2C490012
 
 # Story Hybrid uses separate world receipts and keeps the ordinary draw ledger intact.
 [[patches.hook]]
@@ -489,3 +489,10 @@ func = "workshop_ext_rescue_picker"
 before_vram = 0x807F3B38
 text = "if(workshop_hard_picker0330(rdram,ctx))return;"
 
+
+# Eighteen-color selection: preserve saved White Shy Guy stock while fitting
+# its visible icons within the native parent's twenty-child capacity.
+[[patches.hook]]
+func = "func_8057D7D0"
+before_vram = 0x8057D8E4
+text = "workshop_elemental_selection_capacity0355(rdram,ctx);"

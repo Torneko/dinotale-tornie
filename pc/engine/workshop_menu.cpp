@@ -22,13 +22,18 @@ extern "C" int workshop_battle_failed();
 
 #include "hybrid_mode.hpp"
 #include "game_modes0320.hpp"
+#include "bonus_game0352.hpp"
 #include "story_hybrid0320.hpp"
 #include "story_rights0320.hpp"
+#include "known_yoshis_runtime0355.hpp"
+#include "book_unlock_art0355.hpp"
+#include "stb/stb_image.h"
 #include "hybrid_finds.hpp"
 #include "story_hard_bridge0330.hpp"
 #include "story_hard0330.hpp"
 #include "hybrid_completion0290.hpp"
 #include "metal_yoshis0300.hpp"
+#include "elemental_yoshis0355.hpp"
 #include "heart_shop0283.hpp"
 #include "purchase_audio0284.hpp"
 #include "menu_music_gate0310.hpp"
@@ -100,6 +105,15 @@ ContextId menu_context=ContextId::null();
 
 ContextId game_link_context=ContextId::null();
 
+std::array<Image*,6> unknown_book_yoshis0355{};
+unsigned illustrated_known0355=~0u;
+void refresh_book_yoshis0355(){
+ const auto known=workshop::known_yoshis_runtime0355::snapshot().knownMask18;
+ if(known==illustrated_known0355)return;illustrated_known0355=known;
+ for(unsigned i=0;i<6;++i)if(auto layer=unknown_book_yoshis0355[i]){
+  if(known&(1u<<(8+i)))layer->display_hide();else layer->display_show();
+ }
+}
 Element* resume_button=nullptr;
 
 Element* session_menu_button=nullptr;
@@ -207,6 +221,7 @@ nlohmann::json story_progress0320=nlohmann::json::object();
 nlohmann::json hard_progress0330=nlohmann::json::object();
 void refresh_canonical_progress0320(){
     const auto rights=workshop::story_rights0320::read(recomp::get_config_path()/"saves"/"yoshisstory.n64.us.bin");
+    workshop::known_yoshis_runtime0355::canonical(rights);
     if(!rights.present||!rights.readable){progress={{"valid",false}};return;}
     const auto finds=workshop::finds::view();
     const unsigned owned=finds.initialized&&finds.readable&&finds.migrated?finds.found:rights.legacy_owned;
@@ -214,12 +229,21 @@ void refresh_canonical_progress0320(){
 }
 void write_progress_summary0320(){
     const int selected=session_mode.load();
+    if(selected==workshop::game_modes0320::Bonus){
+        const auto state=workshop::bonus_game0352::view();
+        std::ofstream summary("menu-progress-bonus0352.json");
+        summary<<nlohmann::json{{"schema",1},{"bonusUnlockedMask",state.access.unlocked_mask},{"bonusCompletedMask",state.session.completed_mask},{"fullRouteAvailable",state.full_route_available}}.dump(2)<<'\n';return;
+    }
     const bool hybrid=selected==workshop::game_modes0320::StoryHybrid,hard=selected==workshop::game_modes0320::StoryHard;
     const char* name=hard?(workshop::story_hard_bridge0330::preview()?"menu-progress-story-hard-preview.json":"menu-progress-story-hard.json"):hybrid?"menu-progress-story-hybrid.json":"menu-progress.json";
     std::ofstream summary(name);summary<<(hard?hard_progress0330:hybrid?story_progress0320:progress).dump(2)<<'\n';
 }
 void home();
 void story_hard_page0330();
+void trial_modes0352();
+void bonus_levels0352(unsigned page=0);
+bool bonus_outcome_page0353(const workshop::bonus_game0352::View&);
+bool bonus_resume_allowed0353(const workshop::bonus_game0352::View&);
 
 void open_book();
 
@@ -385,6 +409,7 @@ void home(){
 
     detail_open=false;detail_page->display_hide();main_page->display_show();
 
+    refresh_book_yoshis0355();
     update_titles();focus_pending=choices[0];focus_waited=false;
 
     menu_context.set_autofocus_element(choices[0]);
@@ -422,6 +447,8 @@ void back(unsigned slot=0){action(slot,tr("Retour","Back"),home);}
 void resume_game(){
 
     if(loading_mode)return;
+    if(workshop::bonus_game0352::active()&&bonus_outcome_page0353(workshop::bonus_game0352::view()))return;
+    if(workshop::bonus_game0352::active()&&workshop::bonus_game0352::view().interrupted){home();footer->set_text(tr("La tentative a été interrompue. Choisis un autre mode pour quitter cet essai.","The attempt was interrupted. Choose another mode to leave this preview."));return;}
 
     // Finish dispatching the button/key event before hiding its document or
 
@@ -432,6 +459,7 @@ void resume_game(){
 }
 
 void open_book(){
+    refresh_canonical_progress0320();
 
     if(loading_mode)return;
 
@@ -450,6 +478,7 @@ void open_book(){
     auto previous=recompui::try_close_current_context();
 
     menu_context.open();home();
+    if(workshop::bonus_game0352::active())bonus_outcome_page0353(workshop::bonus_game0352::view());
 
     if(!recompui::is_context_shown(menu_context))recompui::show_context(menu_context,"");
 
@@ -457,6 +486,28 @@ void open_book(){
 
     fprintf(stderr,"[BookLink] ui=open-book\n");fflush(stderr);
 
+}
+
+// A selected Bonus survives the existing runtime handoff as numeric argv.
+// No extra file is written and the destination revalidates the selection.
+std::vector<std::string> bonus_launch_arguments0353(int mode){
+    if(mode<0&&workshop::bonus_game0352::active()&&workshop::bonus_game0352::preview_requested()){
+        const auto state=workshop::bonus_game0352::view();
+        if(state.full_route_available&&state.selected_bonus>=1&&state.selected_bonus<=6){
+            const auto& attempt=state.session.attempts[state.selected_bonus-1];
+            return {"--workshop-bonus-finales0353",std::to_string(state.selected_bonus),std::to_string(attempt?attempt->seed:24)};
+        }
+    }
+    if(mode!=workshop::game_modes0320::Bonus||!workshop::bonus_game0352::launch_requested())return {};
+    const auto selected=workshop::bonus_game0352::pending_launch();
+    if(!selected||selected->bonus<1||selected->bonus>6)return {};
+    return {"--workshop-bonus-selection0353",std::to_string(selected->bonus),std::to_string(selected->seed),selected->new_attempt?"1":"0"};
+}
+bool bonus_resume_allowed0353(const workshop::bonus_game0352::View& state){
+    return !state.interrupted&&!state.completed&&!state.game_over;
+}
+bool bonus_launch_authorized0353(){
+    return workshop::bonus_game0352::preview_requested()||workshop::bonus_game0352::launch_requested();
 }
 
 void route_native(int mode){
@@ -500,6 +551,7 @@ void route_native(int mode){
             write_progress_summary0320();
 
             std::wstring command=L"\""+std::wstring(executable.data())+L"\" --workshop-wait-parent "+std::to_wstring(GetCurrentProcessId())+L" --workshop-main-menu"+(mode>=0?L" --workshop-start-mode "+std::to_wstring(mode):L"");
+            for(const auto& argument:bonus_launch_arguments0353(mode))command+=L" "+std::wstring(argument.begin(),argument.end());
 
             STARTUPINFOW startup{};startup.cb=sizeof(startup);
 
@@ -542,6 +594,7 @@ void route_native(int mode){
 
         std::vector<std::string> next_args{"--workshop-wait-parent",std::to_string(workshop::linux_process::id()),"--workshop-main-menu"};
         if(mode>=0){next_args.push_back("--workshop-start-mode");next_args.push_back(std::to_string(mode));}
+        const auto bonus_args=bonus_launch_arguments0353(mode);next_args.insert(next_args.end(),bonus_args.begin(),bonus_args.end());
         if(workshop::linux_process::launch(workshop::linux_process::executable(),next_args,std::filesystem::current_path())){
 
             fprintf(stderr,"[BookLink] Linux handoff mode=%d parent=%u save-barrier=complete\n",mode,workshop::linux_process::id());fflush(stderr);
@@ -588,6 +641,7 @@ void launch_native(int mode){
     }
 
     if(!workshop::game_modes0320::valid(mode))return;
+    if(mode==workshop::game_modes0320::Bonus&&!bonus_launch_authorized0353()){bonus_levels0352();return;}
     if(mode==workshop::game_modes0320::StoryHard){
         const auto rights=workshop::story_hard_bridge0330::access();
         const auto local=workshop::story_hard0330::view();
@@ -639,10 +693,11 @@ void launch_native(int mode){
     workshop::achievements::start_session(unsigned(mode));
     workshop::hybrid_completion0290::start_session(unsigned(mode));
     workshop::metal_yoshis0300::start_session(unsigned(mode),mode!=4);
+    workshop::elemental_yoshis0355::start_session(unsigned(mode),true);
 
     workshop::collections::start_session(unsigned(mode));
 
-    fprintf(stderr,"[BookMenu] launch=%s\n",mode==0?"story":mode==5?"story-hybrid":mode==6?"story-hard":mode==1?"trial":mode==3?"hybrid":mode==4?"boss-battle":"practice");fflush(stderr);
+    fprintf(stderr,"[BookMenu] launch=%s\n",mode==0?"story":mode==5?"story-hybrid":mode==6?"story-hard":mode==7?"bonus":mode==1?"trial":mode==3?"hybrid":mode==4?"boss-battle":"practice");fflush(stderr);
 
     release_book_music0310();
     recomp::start_game(u8"yoshisstory.n64.us",{});recompui::hide_all_contexts();
@@ -723,9 +778,9 @@ void creation(){
 void boss_battle(){
     std::string challenge_text;
 #ifdef WORKSHOP_NATIVE_COOP
-    const auto mask=workshop_battle_challenges();challenge_text=tr("Défis remportés : ","Challenges won: ")+std::to_string(std::popcount(mask))+" / 14\n\n";
+    const auto mask=workshop_battle_challenges();challenge_text=tr("Défis remportés : ","Challenges won: ")+std::to_string(std::popcount(mask))+" / 18\n\n";
     if(!workshop_battle_challenge_readable())challenge_text+=tr("Le fichier des défis est illisible. Il est conservé ; les nouveaux résultats ne peuvent pas être enregistrés.\n\n","The challenge file cannot be read. It has been preserved; new results cannot be saved.\n\n");
-    for(unsigned color=0;color<14;++color){const auto& id=workshop::coop_health0250::identities[color];challenge_text+=(mask&(1u<<color))?"[x] ":"[ ] ";challenge_text+=french?id.french:id.english;challenge_text+=color%2?"\n":" | ";}
+    for(unsigned color=0;color<18;++color){challenge_text+=(mask&(1u<<color))?"[x] ":"[ ] ";if(!workshop::known_yoshis_runtime0355::snapshot().known(color))challenge_text+="???";else if(color==6)challenge_text+=tr("Blanc","White");else if(color==7)challenge_text+=tr("Noir","Black");else if(color<14){const auto& id=workshop::coop_health0250::identities[color];challenge_text+=french?id.french:id.english;}else challenge_text+=color==14?tr("Or","Gold"):color==15?tr("Argent","Silver"):color==16?tr("Feu/lave","Fire/Lava"):tr("Eau/glace","Water/Ice");challenge_text+=color%2?"\n":" | ";}
 #endif
     panel("Boss Battle",tr("Dix combats, un Yoshi. Les prochains boss restent cachés.\n\nAu repos : Lucky Tree, bloc d’œufs et pot vers le combat suivant. L’arbre garde les fruits consommés et dispose de deux régénérations par session.\n\nAprès les boss 3, 6 et 9, réveille le personnage numéroté : après une défaite, le même Yoshi reprend avec la vie et les œufs enregistrés. Un grand cœur à usage unique apparaît après le cinquième boss.","Ten battles, one Yoshi. Upcoming bosses stay hidden.\n\nAt each rest stop: Lucky Tree, egg block and pot to the next fight. The tree remembers consumed fruit and has two regenerations per session.\n\nAfter bosses 3, 6 and 9, wake the numbered character: after a defeat, the same Yoshi returns with the saved health and eggs. A one-use big heart appears after the fifth boss."));
 #ifdef WORKSHOP_NATIVE_COOP
@@ -951,14 +1006,20 @@ void statistics(){
     else text+=tr("Suivi du Trial hybride illisible, conservé.\n","Unreadable Hybrid Trial progress preserved.\n");
 
     if(story_hybrid.present&&story_hybrid.readable)text+=tr("Mondes terminés en Story hybride : ","Hybrid Story worlds cleared: ")+std::to_string(story_hybrid.count)+" / 6\n";
-    if(hard.present&&hard.readable&&hard.scope==workshop::story_hard0330::Scope::Production)text+=tr("Réussites Story difficile : ","Hard Story runs cleared: ")+std::to_string(hard.runs_won)+tr(" · Yoshis : "," · Yoshis: ")+std::to_string(std::popcount(hard.completed))+" / 16\n";
+    if(hard.present&&hard.readable&&hard.scope==workshop::story_hard0330::Scope::Production)text+=tr("Réussites Story difficile : ","Hard Story runs cleared: ")+std::to_string(hard.runs_won)+tr(" · Yoshis : "," · Yoshis: ")+std::to_string(std::popcount(hard.completed))+" / 18\n";
     text+=tr("Yoshis hybrides débloqués : ","Hybrid Yoshis unlocked: ")+std::to_string(std::popcount(extras))+" / 6\n\n";
 
+    const auto elements=workshop::elemental_yoshis0355::view();
+    if(elements.initialized&&elements.readable){
+        text+=tr("Yoshis élémentaires trouvés : ","Elemental Yoshis found: ")+std::to_string(std::popcount(elements.found))+" / 2\n";
+        text+=std::string(workshop::known_yoshis_runtime0355::snapshot().label(16,tr("Feu/lave","Fire/Lava")))+" : ";text+=elements.found&1?tr("trouvé","found"):tr("à trouver","not found");
+        text+=" · "+std::string(workshop::known_yoshis_runtime0355::snapshot().label(17,tr("Eau/glace","Water/Ice")))+" : ";text+=elements.found&2?tr("trouvé","found"):tr("à trouver","not found");text+="\n\n";
+    }
     const auto metals=workshop::metal_yoshis0300::view();
     if(metals.readable){
         text+=tr("Yoshis or et argent trouvés : ","Gold and Silver Yoshis found: ")+std::to_string(std::popcount(metals.found))+" / 2\n";
-        text+=tr("Or : ","Gold: ");text+=(metals.found&1?tr("trouvé","found"):tr("à trouver","not found"));
-        text+=tr(" · Argent : "," · Silver: ");text+=(metals.found&2?tr("trouvé","found"):tr("à trouver","not found"));
+        text+=std::string(workshop::known_yoshis_runtime0355::snapshot().label(14,tr("Or","Gold")))+" : ";text+=(metals.found&1?tr("trouvé","found"):tr("à trouver","not found"));
+        text+=" · "+std::string(workshop::known_yoshis_runtime0355::snapshot().label(15,tr("Argent","Silver")))+" : ";text+=(metals.found&2?tr("trouvé","found"):tr("à trouver","not found"));
         text+=tr("\nLes 24 Trial hybrides terminés permettent de chercher leurs œufs aux emplacements du Maskass blanc, un à la fois.\n\n","\nClear all 24 Hybrid Trial levels to search for their eggs at White Shy Guy locations, one at a time.\n\n");
         if(!metals.saved)text+=tr("Dernier résultat or/argent non enregistré.\n","Latest Gold/Silver result not saved.\n");
     }else text+=tr("Suivi or/argent illisible, conservé.\n\n","Unreadable Gold/Silver progress preserved.\n\n");
@@ -1063,7 +1124,7 @@ void story_hard_page0330(){
     }
     if(local.present&&local.readable){
         text+=tr("Parties réussies : ","Successful runs: ")+std::to_string(local.runs_won)+"\n";
-        text+=tr("Yoshis ayant réussi : ","Yoshis with a clear: ")+std::to_string(std::popcount(local.completed))+" / 16\n";
+        text+=tr("Yoshis ayant réussi : ","Yoshis with a clear: ")+std::to_string(std::popcount(local.completed))+" / 18\n";
     }
     const bool play=(preview||workshop::story_hard_access0330::entitled(rights))&&local.readable&&local.saved;
     if(!play)text+=tr("\nMode verrouillé jusqu’à validation de toutes les conditions. Les sauvegardes sont conservées.","\nLocked until all requirements are met. Existing saves are preserved.");
@@ -1091,9 +1152,80 @@ void options(){
 
 }
 
+
+void trial_modes0352(){
+    panel(tr("Trial","Trial"),tr("Rejoue les niveaux classiques ou découvre les six niveaux bonus associés aux pages du livre.","Replay classic courses or discover the six bonus courses associated with the book pages."));
+    action(0,tr("Trial classique","Classic Trial"),[]{launch_native(1);});
+    action(1,tr("Niveaux bonus","Bonus courses"),[]{bonus_levels0352(0);});back(2);
+}
+void launch_bonus0353(unsigned page,bool new_attempt){
+    if(!workshop::bonus_game0352::request_bonus(page+1,new_attempt)){
+        bonus_levels0352(page);
+        footer->set_text(tr("Ce bonus ne peut pas être ouvert pour le moment. La progression est conservée.","This bonus cannot be opened right now. Progress has been preserved."));return;
+    }
+    launch_native(workshop::game_modes0320::Bonus);
+}
+bool bonus_outcome_page0353(const workshop::bonus_game0352::View& state){
+    if(!state.completed&&!state.game_over)return false;
+    const unsigned selected=state.selected_bonus;
+    std::string text;
+    if(selected>=1&&selected<=6){
+        text=tr("Niveau bonus 7-","Bonus course 7-")+std::to_string(selected)+"\n\n";
+        if(state.completed){
+            text+=tr("Le parcours est terminé !", "The course is complete!");
+            const bool saved=state.session.readable&&state.session.last_write_succeeded&&(state.session.completed_mask&(1u<<(selected-1)));
+            text+=saved?tr("\nLa réussite est enregistrée.","\nThe clear has been saved."):tr("\nL’enregistrement de la réussite n’a pas pu être confirmé. Les fichiers existants sont conservés.","\nThe clear could not be confirmed as saved. Existing files have been preserved.");
+        }else text+=tr("Tous les Yoshis de cette tentative ont été perdus. Les réussites déjà enregistrées sont conservées.","All Yoshis in this attempt have been lost. Previously saved clears are preserved.");
+    }else text=tr("Consulte les niveaux bonus pour choisir la suite. La progression enregistrée est conservée.","Open the bonus courses to choose what comes next. Saved progress is preserved.");
+    panel(state.completed?tr("Bonus terminé","Bonus complete"):tr("Équipe épuisée","Team exhausted"),text);
+    if(selected>=1&&selected<=6){
+        const unsigned page=selected-1;
+        const bool playable=state.full_route_available&&(state.access.unlocked_mask&(1u<<page))&&state.session.readable&&state.session.last_write_succeeded;
+        if(playable)action(0,state.completed?tr("Rejouer","Play again"):tr("Nouvelle tentative","New attempt"),[page]{launch_bonus0353(page,true);});
+        action(1,tr("Voir ce bonus","View this bonus"),[page]{bonus_levels0352(page);});
+        action(2,tr("Autres bonus","Other bonuses"),[page]{bonus_levels0352((page+1)%6);});
+    }else action(1,tr("Niveaux bonus","Bonus courses"),[]{bonus_levels0352(0);});
+    action(3,tr("Menu principal","Main menu"),home);return true;
+}
+void bonus_levels0352(unsigned page){
+    page%=6;
+    workshop::bonus_game0352::refresh(recomp::get_config_path());
+    const auto state=workshop::bonus_game0352::view();
+    const auto combined=state.access.classic_mask|state.access.hybrid_mask;
+    const unsigned cleared=std::popcount((combined>>(page*4))&15u);
+    const bool unlocked=(state.access.unlocked_mask&(1u<<page))!=0;
+    std::string text=tr("Termine les quatre niveaux de cette page en Trial classique ou hybride. Les réussites des deux modes comptent ensemble.","Clear this page's four courses in classic or Hybrid Trial. Clears from both modes count together.");
+    text+=tr("\n\nProgression : ","\n\nProgress: ")+std::to_string(cleared)+" / 4";
+    text+=unlocked?tr("\nCondition remplie.","\nRequirement met."):tr("\nCondition encore à remplir.","\nRequirement not yet met.");
+    text+=tr("\n\nLe parcours réunira toutes les salles du monde, dans un ordre conservé pendant la tentative. Chaque bonus possède sa propre finale.","\n\nThe route will include every room in the world, in an order kept throughout the attempt. Each bonus has its own finale.");
+    if(!state.full_route_available)
+        text+=tr("\n\nCe niveau bonus est en préparation et n'est pas encore jouable.","\n\nThis bonus course is being prepared and is not playable yet.");
+    else
+        text+=tr("\n\nDans les salles à un seul pot, maintiens L en entrant pour revenir en arrière. Entre normalement pour avancer.","\n\nIn rooms with one pot, hold L while entering to go back. Enter normally to move forward.");
+    if(state.full_route_available)
+        text+=tr("\n\nAprès fermeture du jeu, Reprendre revient à la première salle, avec le même ordre et les salles déjà validées. Pendant la partie, les checkpoints conservent la reprise native.","\n\nAfter closing the game, Resume returns to the first room, keeping the same order and cleared rooms. During play, checkpoints retain native continuation.");
+    if(!state.access.classic_readable||!state.access.hybrid_readable)
+        text+=tr("\nUne progression n'a pas pu être lue ; elle est conservée.","\nSome progress could not be read; it has been preserved.");
+    panel(tr("Niveau bonus 7-","Bonus course 7-")+std::to_string(page+1),text);
+    const bool playable=state.full_route_available&&unlocked&&state.session.readable&&state.session.last_write_succeeded;
+    if(playable){
+        const auto& attempt=state.session.attempts[page];
+        const bool ended_here=state.selected_bonus==page+1&&(state.completed||state.game_over);
+        const bool resume=attempt&&attempt->phase!=workshop::bonus_session0351::Phase::Completed&&!ended_here;
+        action(0,resume?tr("Reprendre","Resume"):tr("Jouer","Play"),[page,resume]{launch_bonus0353(page,!resume);});
+        if(resume)action(1,tr("Recommencer","Restart"),[page]{launch_bonus0353(page,true);});
+        action(2,tr("Bonus suivant","Next bonus"),[page]{bonus_levels0352((page+1)%6);});
+        action(3,tr("Retour au Trial","Back to Trial"),trial_modes0352);
+    }else{
+        action(0,tr("Bonus précédent","Previous bonus"),[page]{bonus_levels0352((page+5)%6);});
+        action(1,tr("Bonus suivant","Next bonus"),[page]{bonus_levels0352((page+1)%6);});
+        action(2,tr("Retour au Trial","Back to Trial"),trial_modes0352);back(3);
+    }
+}
+
 void choose(unsigned item){
 
-    switch(item){case 0:story_modes0320();break;case 1:launch_native(1);break;case 2:creation();break;case 3:statistics();break;case 4:hybrid();break;case 5:options();break;case 6:launch_native(2);break;case 7:boss_battle();break;}
+    switch(item){case 0:story_modes0320();break;case 1:trial_modes0352();break;case 2:creation();break;case 3:statistics();break;case 4:hybrid();break;case 5:options();break;case 6:launch_native(2);break;case 7:boss_battle();break;}
 
 }
 
@@ -1131,6 +1263,20 @@ void create(LauncherMenu* menu){
         right_clip->set_overflow(Overflow::Hidden);right_clip->set_pointer_events(PointerEvents::None);
         auto right_art=menu_context.create_element<Image>(right_clip,"?/workshop/book-right-approved");
         rect(right_art,-100,0,200,100);right_art->set_pointer_events(PointerEvents::None);
+        int width=0,height=0,channels=0;
+        auto pixels=stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(right_bytes.data()),int(right_bytes.size()),&width,&height,&channels,4);
+        if(pixels){
+            const auto layers=workshop::book_unlock_art0355::layers({pixels,size_t(width)*height*4},unsigned(width),unsigned(height));
+            stbi_image_free(pixels);
+            for(unsigned i=0;i<layers.size();++i){
+                const auto& data=layers[i];const auto key="?/workshop/locked-yoshi-0355-"+std::to_string(data.color);
+                recompui::queue_image_from_bytes_rgba32(key,data.rgba,data.width,data.height);
+                auto layer=menu_context.create_element<Image>(right_clip,key);
+                rect(layer,200.f*data.x/1448.f-100.f,100.f*data.y/1086.f,200.f*data.width/1448.f,100.f*data.height/1086.f);
+                layer->set_pointer_events(PointerEvents::None);unknown_book_yoshis0355[i]=layer;
+            }
+            if(layers.size()!=6)fprintf(stderr,"[BookArtwork0355] Unsupported illustration dimensions; approved image retained.\n");
+        }else fprintf(stderr,"[BookArtwork0355] Could not decode illustration for lock effect.\n");
     }else fprintf(stderr,"[BookMenu] corrected right illustration missing; original artwork retained.\n");
 
 
@@ -1371,6 +1517,7 @@ void ui_frame(){
     if(resume_pending){
 
         resume_pending=false;
+        if(workshop::bonus_game0352::active()&&!bonus_resume_allowed0353(workshop::bonus_game0352::view())){open_book();return;}
 
         if(recompui::is_context_shown(menu_context))recompui::hide_context(menu_context);
 
@@ -1463,6 +1610,7 @@ void ui_frame(){
     if(workshop::book::take_open_request())open_book();
 
     bool book_shown=recompui::is_context_shown(menu_context);
+    if(book_shown)refresh_book_yoshis0355();
 
     const auto native=workshop::book::snapshot();
 
@@ -1492,13 +1640,13 @@ void ui_frame(){
             progress["extraYoshiMask"]=s.extras;
         }
         else if(session_mode.load()==workshop::game_modes0320::StoryHard)hard_progress0330=observed;
-        else progress=observed;
+        else if(session_mode.load()!=workshop::game_modes0320::Bonus)progress=observed;
 
         if(!loading_mode)update_titles();
 
     }
 
-    if(ultramodern::is_game_started() && !loading_mode)resume_button->display_show();else resume_button->display_hide();
+    if(ultramodern::is_game_started() && !loading_mode && (!workshop::bonus_game0352::active()||bonus_resume_allowed0353(workshop::bonus_game0352::view())))resume_button->display_show();else resume_button->display_hide();
 
 #ifdef WORKSHOP_CONTENT_BUILD
 
@@ -1566,6 +1714,7 @@ void workshop_menu_enable(){
     workshop::hybrid_mode::initialize();
     workshop::hybrid_completion0290::initialize("pc-hybrid-completion.json","pc-hybrid-records.json");
     workshop::metal_yoshis0300::initialize();
+    workshop::elemental_yoshis0355::initialize();
     (void)workshop::heart_shop0283::wallet();
 
     // The final credits image can stop submitting native display lists.

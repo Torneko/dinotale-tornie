@@ -1,5 +1,6 @@
 #pragma once
 #include "json/json.hpp"
+#include "boss_evidence0354.hpp"
 #include <array>
 #include <algorithm>
 #include <atomic>
@@ -33,7 +34,7 @@ namespace workshop::boss_challenges0260 {
 // CPU validation of these fields is not proof that native gameplay occurred.
 enum class Provenance { Unknown,ProductionMenu,ScriptedQa,ManualQa,Simulation };
 struct EncounterEvidence {
-    unsigned number=0,expectedMembers=0,defeatedMask=0,defeatVi=0,color=14;
+    unsigned number=0,expectedMembers=0,defeatedMask=0,defeatVi=0,color=18;
     uint32_t player=0;
     bool initialized=false,active=false,terminal=false,causal=false;
 };
@@ -41,14 +42,17 @@ struct CompletionEvidence {
     std::string token;
     Provenance provenance=Provenance::Unknown;
     bool phaseComplete=false,diagnostic=false,qaMarker=false,skippedEntry=false;
-    unsigned completed=0,index=0,color=14,initialColor=14,completionVi=0;
+    unsigned completed=0,index=0,color=18,initialColor=18,completionVi=0;
     uint32_t player=0,initialPlayer=0;
     uint16_t playerKind=0;
     std::array<EncounterEvidence,10> encounters{};
 };
 struct Snapshot {
-    uint16_t mask14=0;
+    uint16_t mask14=0,mask16=0;
+    uint32_t mask18=0;
     std::array<unsigned,14> counts14{};
+    std::array<unsigned,16> counts16{};
+    std::array<unsigned,18> counts18{};
     bool readable=false,saved=false;
     std::string reason;
 };
@@ -70,7 +74,7 @@ inline std::string evidence_error(const CompletionEvidence& e){
     if(e.diagnostic||e.qaMarker||e.skippedEntry)return "qa-or-skipped-entry";
     if(!e.phaseComplete||e.completed!=10||e.index!=9)return "ten-complete-encounters-required";
     if(!pointer(e.player)||e.player!=e.initialPlayer||e.playerKind!=0x4001)return "player-identity-changed";
-    if(e.color>=14||e.color!=e.initialColor)return "yoshi-color-changed";
+    if(e.color>=18||e.color!=e.initialColor)return "yoshi-color-changed";
     unsigned previous=0;
     for(unsigned n=0;n<10;++n){const auto& r=e.encounters[n];
         if(r.number!=n+1||r.expectedMembers<1||r.expectedMembers>4||r.defeatedMask!=((1u<<r.expectedMembers)-1))return "incomplete-native-member-set";
@@ -97,22 +101,16 @@ inline State read_disk(){
     if(std::filesystem::is_symlink(status)||!std::filesystem::is_regular_file(status))throw std::runtime_error("ledger-not-regular-file");
     if(std::filesystem::file_size(filename)>max_file_bytes)throw std::runtime_error("ledger-too-large");
     std::ifstream file(filename,std::ios::binary);if(!file)throw std::runtime_error("ledger-open-failed");
-    const auto data=nlohmann::json::parse(file);
-    if(!data.is_object()||data.size()!=4||!data.contains("schema")||!data["schema"].is_number_unsigned()||data["schema"]!=1||!data.contains("mask14")||!data["mask14"].is_number_unsigned()||!data.contains("counts14")||!data["counts14"].is_array()||data["counts14"].size()!=14||!data.contains("runs")||!data["runs"].is_array()||data["runs"].size()>max_runs)throw std::runtime_error("ledger-format-invalid");
-    const auto mask=data["mask14"].get<uint64_t>();if(mask>0x3FFF)throw std::runtime_error("ledger-mask-invalid");
-    for(const auto& row:data["runs"]){
-        if(!row.is_object()||row.size()!=2||!row.contains("token")||!row["token"].is_string()||!row.contains("color")||!row["color"].is_number_unsigned())throw std::runtime_error("ledger-run-invalid");
-        const auto token=row["token"].get<std::string>();const auto color=row["color"].get<uint64_t>();
-        if(!hex_token(token)||token!=normalized(token)||color>=14||!result.runs.emplace(token,unsigned(color)).second)throw std::runtime_error("ledger-run-identity-invalid");
-        result.view.counts14[color]++;result.view.mask14|=uint16_t(1u<<color);
-    }
-    if(result.view.mask14!=mask)throw std::runtime_error("ledger-mask-count-mismatch");
-    for(unsigned n=0;n<14;++n)if(!data["counts14"][n].is_number_unsigned()||data["counts14"][n].get<uint64_t>()!=result.view.counts14[n])throw std::runtime_error("ledger-count-mismatch");
+    std::string bytes(max_file_bytes+1,'\0');file.read(bytes.data(),std::streamsize(bytes.size()));bytes.resize(size_t(file.gcount()));
+    if(bytes.size()>max_file_bytes||(!file.eof()&&!file))throw std::runtime_error("ledger-read-failed");
+    const auto parsed=boss_evidence0354::decode(bytes);result.runs=parsed.runs;
+    result.view.mask18=parsed.mask18;result.view.counts18=parsed.counts18;result.view.mask16=parsed.mask16;result.view.counts16=parsed.counts16;
+    result.view.mask14=uint16_t(parsed.mask16&0x3FFFu);std::copy_n(parsed.counts16.begin(),14,result.view.counts14.begin());
     return result;
 }
 inline std::string encode(const State& value){
     auto runs=nlohmann::json::array();for(const auto& [token,color]:value.runs)runs.push_back({{"token",token},{"color",color}});
-    return nlohmann::json{{"schema",1u},{"mask14",unsigned(value.view.mask14)},{"counts14",value.view.counts14},{"runs",runs}}.dump(2)+'\n';
+    return nlohmann::json{{"schema",3u},{"mask18",value.view.mask18},{"counts18",value.view.counts18},{"runs",runs}}.dump(2)+'\n';
 }
 inline void atomic_replace(const std::string& bytes){
     auto temp=filename;temp+=std::string(".tmp-")+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())+"-"+std::to_string(serial.fetch_add(1));
@@ -155,7 +153,7 @@ inline bool record(const CompletionEvidence& evidence){
     const auto token=detail::normalized(evidence.token);
     if(detail::state.runs.contains(token))return reject("duplicate-run-token");
     if(detail::state.runs.size()>=detail::max_runs)return reject("ledger-capacity-reached");
-    auto next=detail::state;next.runs.emplace(token,evidence.color);next.view.counts14[evidence.color]++;next.view.mask14|=uint16_t(1u<<evidence.color);next.view.reason.clear();
+    auto next=detail::state;next.runs.emplace(token,evidence.color);next.view.counts18[evidence.color]++;next.view.mask18|=1u<<evidence.color;next.view.mask16=uint16_t(next.view.mask18&0xFFFFu);std::copy_n(next.view.counts18.begin(),16,next.view.counts16.begin());next.view.mask14=uint16_t(next.view.mask16&0x3FFFu);std::copy_n(next.view.counts16.begin(),14,next.view.counts14.begin());next.view.reason.clear();
     try{detail::atomic_replace(detail::encode(next));detail::state=std::move(next);return true;}
     catch(const std::exception& e){detail::state.view.saved=false;return reject(e.what());}
 }

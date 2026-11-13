@@ -31,7 +31,7 @@ bool persist(){
 }
 void configure(const std::string& value,bool next,int color,unsigned source){
     workshop::require(value.size()==32 && value.find_first_not_of("0123456789abcdefABCDEF")==std::string::npos,"Invalid custom run token");
-    workshop::require(color>=-1 && color<16,"Invalid preferred Yoshi");
+    workshop::require(color>=-1 && color<18,"Invalid preferred Yoshi");
     workshop::require(vanilla_stage(source)>=0,"Invalid custom level source");
     stage=vanilla_stage(source);token=value;automatic=next;preferred=color;completed=false;stored=true;
 }
@@ -56,7 +56,7 @@ void finish(uint8_t* rdram){
     if(!active() || ready() || uint32_t(MEM_W(0,int32_t(0x800F89D0)))!=30 || uint32_t(MEM_W(0,int32_t(0x800F8AC8)))!=1)return;
     std::lock_guard lock(mutex);if(completed)return;
     const auto color=uint32_t(MEM_W(0,int32_t(0x807F0008)));
-    result={{"schema",1},{"token",token},{"completed",true},{"fruits",30},{"selectedColor",color<16?color:0},{"advance",true}};
+    result={{"schema",1},{"token",token},{"completed",true},{"fruits",30},{"selectedColor",color<18?color:0},{"advance",true}};
     stored=persist();completed=true;
     fprintf(stderr,"[CustomSession] finished token=%s fruits=30 color=%u saved=%d\n",token.c_str(),color,int(stored.load()));fflush(stderr);
 }

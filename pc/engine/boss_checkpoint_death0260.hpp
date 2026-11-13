@@ -59,7 +59,7 @@ inline bool cleanup(uint8_t* ram,recomp_context* context,uint32_t player,uint32_
  if(!escort_count)return true;
  const auto stack=uint32_t(context->r29);if(stack<0x80000800||!pointer(stack-0x400,0x480))return false;
  const auto native_color=n::word(ram,0x800F8DB0),pc_color=n::word(ram,0x807F0008);
- if(native_color>=8||pc_color>=14)return false;
+ if(native_color>=8||pc_color>=18||native_color!=yoshi_colors0300::native_alias(pc_color))return false;
  const auto hp=n::word(ram,0x800F8DB4+native_color*4);
  struct Registers {recomp_context* c;recomp_context saved;~Registers(){*c=saved;}} registers{context,*context};
  // All candidates and the entire sparse graph were validated before the first

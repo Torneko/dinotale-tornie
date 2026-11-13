@@ -53,7 +53,7 @@ inline void created(uint8_t*,recomp_context* ctx,unsigned room){
     const auto actor=uint32_t(ctx->r4),kind=uint32_t(ctx->r5)>>16;
     sources.erase(actor);children.erase(actor);eggs.erase(actor);painted.erase(actor);unbound_painted.erase(actor);native_egg_actors.erase(actor);
     if(kind==0x4002 || kind==0x401C || kind==0x401D || kind==0x401E)native_egg_actors.insert(actor);
-    if(kind==0x401D && spawning_color>=6 && spawning_color<16)eggs[actor]={unsigned(spawning_color),false};
+    if(kind==0x401D && spawning_color>=6 && spawning_color<18)eggs[actor]={unsigned(spawning_color),false};
     auto it=placements.find({room&255,uint32_t(ctx->r5),uint32_t(ctx->r6),uint32_t(ctx->r7)});
     if(it!=placements.end()){
         sources.emplace(actor,Source{room&255,it->second});
@@ -67,7 +67,7 @@ inline std::optional<unsigned> release_color(uint8_t*,recomp_context* ctx){
     if(auto it=children.find(uint32_t(ctx->r7));it!=children.end() && it->second.room==current_room)return it->second.color;
     return {};
 }
-inline void spawned(uint32_t actor,unsigned c){if(actor && c>=6 && c<16)eggs[actor]={c,false};}
+inline void spawned(uint32_t actor,unsigned c){if(actor && c>=6 && c<18)eggs[actor]={c,false};}
 inline bool egg_state(uint32_t actor,unsigned){return eggs.contains(actor);}
 inline bool pickup_sound(uint8_t* rdram,recomp_context* ctx,uint32_t actor,unsigned state){
     auto it=eggs.find(actor);if(it==eggs.end() || it->second.sounded || (state!=4 && state!=5))return false;
@@ -88,7 +88,7 @@ inline uint32_t native_egg_resource(uint8_t* rdram){
         const auto r=gpr(int32_t(resource));
         if(MEM_HU(0x3C,r)!=0x401D || MEM_W(0x30,r))continue;
         const auto palette=uint32_t(MEM_W(0x88,r)),texture=uint32_t(MEM_W(0x84,r));
-        if(fruit_mix::range(palette,16*512) && fruit_mix::range(texture,0x20))return resource;
+        if(fruit_mix::range(palette,18*512) && fruit_mix::range(texture,0x20))return resource;
     }
     return 0;
 }

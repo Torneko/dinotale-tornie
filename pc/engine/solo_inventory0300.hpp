@@ -16,10 +16,10 @@ using legacy::valid_scale;
 using legacy::read_scale;
 using legacy::normal_scale;
 using legacy::stage_scale;
-constexpr unsigned native_alias(unsigned color){return color<8?color:color<14?0:color==14?6:color==15?7:8;}
+constexpr unsigned native_alias(unsigned color){return yoshi_colors0300::native_alias(color);}
 inline bool same_player(uint8_t* ram,const Payload& p){
  return ram&&n::actor(ram,p.player,0x4001)&&n::word(ram,0x800F8828)==p.player&&
-        p.pc_color<16&&p.native_color==native_alias(p.pc_color)&&
+        p.pc_color<18&&p.native_color==native_alias(p.pc_color)&&
         n::word(ram,0x800F8DB0)==p.native_color&&n::word(ram,0x807F0008)==p.pc_color;
 }
 inline bool read(uint8_t* ram,uint32_t player,Inventory& out){
@@ -44,15 +44,15 @@ inline bool read(uint8_t* ram,uint32_t player,Inventory& out){
   for(unsigned j=0;j<20;j++)if(n::word(ram,player+0x188+j*4)==a)++references;
   if(references!=1)return false;
   const auto palette=kind==0x4004?n::word(ram,a+0x1EC):0;
-  if(kind==0x4004&&palette>=16)return false;
+  if(kind==0x4004&&palette>=18)return false;
   Scale saved{};if(kind==0x4004&&!read_scale(ram,a,saved))return false;
   result.actors[i]=a;result.eggs[i]={uint16_t(kind),palette,saved};
  }
  out=result;return true;
 }
 inline bool valid(const Payload& p){
- if(!p.activation_vi||!pointer(p.player,0x1FC)||p.pc_color>=16||p.native_color!=native_alias(p.pc_color)||p.hp>8||p.count>6)return false;
- for(unsigned i=0;i<p.count;i++)if(p.eggs[i].kind!=0x4004||p.eggs[i].palette>=16||!valid_scale(p.eggs[i].saved_scale))return false;
+ if(!p.activation_vi||!pointer(p.player,0x1FC)||p.pc_color>=18||p.native_color!=native_alias(p.pc_color)||p.hp>8||p.count>6)return false;
+ for(unsigned i=0;i<p.count;i++)if(p.eggs[i].kind!=0x4004||p.eggs[i].palette>=18||!valid_scale(p.eggs[i].saved_scale))return false;
  for(unsigned i=p.count;i<p.eggs.size();i++)if(p.eggs[i]!=Egg{})return false;
  return true;
 }

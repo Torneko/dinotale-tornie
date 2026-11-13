@@ -13,7 +13,9 @@ void migrate(uint8_t* rdram,const progress::State& authoritative,unsigned story,
 View view();
 unsigned available(unsigned eligible);
 void reset_attempt();
-void enter(unsigned level,unsigned room,bool allowed);
+// Root supplies only already-owned Trial metal losses, in extension bits6/7.
+// This does not own or persist Trial losses; other modes pass zero.
+void enter(unsigned level,unsigned room,bool allowed,unsigned recoverableMetals=0);
 std::optional<unsigned> reserve(unsigned eligible,unsigned source,unsigned x,unsigned y,bool whitePresent);
 void spawned(uint32_t actor,unsigned color,bool scene=true);
 bool scene_actor(uint32_t actor);

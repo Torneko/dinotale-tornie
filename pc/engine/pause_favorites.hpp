@@ -28,6 +28,7 @@ inline void layout(uint8_t* rdram,gpr parent){
     const auto data=MEM_W(0x1F4,parent);if(!pointer(uint32_t(data)))return;
     const auto primary=MEM_W(4,data);if(!pointer(uint32_t(primary)))return;
     const auto color=uint32_t(MEM_W(0,int32_t(0x807F0008)));const auto favorites=list(color);
+    if(!favorites.count){MEM_B(0x165,primary)=1;return;}
     if(favorites.count<2)return;
     const float center=real(rdram,primary,0x3C),parentScale=real(rdram,parent,0x6C);
     const float scale=favorites.count==4?0.75f:0.80f;
@@ -44,6 +45,7 @@ inline bool frame(uint8_t* rdram,gpr actor){
     const unsigned parameter=MEM_HU(14,actor)&0x3FF;
     if(parameter<0x201 || parameter>0x204)return false;
     const auto favorites=list(uint32_t(MEM_W(0,int32_t(0x807F0008))));
+    if(!favorites.count){MEM_B(0x165,actor)=1;return true;}
     const unsigned slot=parameter-0x201;if(slot>=favorites.count)return false;
     MEM_H(0x144,actor)=favorites.frames[slot];return true;
 }

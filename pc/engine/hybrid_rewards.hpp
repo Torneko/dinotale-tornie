@@ -2,6 +2,9 @@
 #include "fruit_mix.hpp"
 #include "special_content_rules.hpp"
 #include "metal_rewards0300.hpp"
+#include "elemental_abilities0355.hpp"
+#include "elemental_food_sources0355.hpp"
+#include "hybrid_maskass_data.hpp"
 #include <optional>
 
 namespace workshop::rewards {
@@ -14,9 +17,25 @@ constexpr int custom_maskass_gain(unsigned variant,unsigned color){
     return hybrid(color)?(standard(special::components[color-8][0])+standard(special::components[color-8][1])+1)/2:standard(color);
 }
 inline std::optional<int> custom_gain(uint32_t actor,unsigned color){
-    if(!custom_enemy_variant || color==6 || color==7 || color>=14)return {};
+    if(!custom_enemy_variant || color>=16)return {};
     auto variant=custom_enemy_variant(actor);if(!variant || *variant>=6)return {};
+    if(color==6 || color==7)return 2;
+    if(yoshi_colors0300::metal(color))return 3;
     return custom_maskass_gain(*variant,color);
+}
+constexpr bool native_maskass(uint16_t id){
+    for(const auto kind:hybrid_mode::maskass_ids)if(kind==id)return true;
+    return false;
+}
+// Only these four colors gain a new Maskass policy. Read the CURRENT native
+// actor identity and current hybrid variant at the reward fence, including
+// after a ground-pound recolor; never retain a spawn-time color here.
+inline std::optional<int> custom_gain(uint8_t* rdram,uint32_t actor,unsigned color){
+    if(color!=6 && color!=7 && !yoshi_colors0300::metal(color))return custom_gain(actor,color);
+    if(!rdram || !fruit_mix::range(actor,0x10) || !native_maskass(MEM_HU(12,int32_t(actor))))return {};
+    if(auto value=custom_gain(actor,color))return value;
+    if(yoshi_colors0300::metal(color))return 2;
+    return {}; // Ordinary White/Black Maskass retain genuine native3/3.
 }
 constexpr bool enemy_food(uint16_t id){
     return !(id>=0x4030 && id<=0x4035) && special::fruit_index(id)<0
@@ -55,13 +74,33 @@ inline std::optional<int> food_gain(uint8_t* rdram,uint32_t actor,unsigned color
     const auto id=MEM_HU(12,int32_t(actor));
     const int fruit=special::fruit_index(id);
     if(fruit>=0 && lucky_fruit_type && unsigned(6+fruit)==lucky_fruit_type())return 8;
+    // Water chili enters the poison continuation for health, but its score
+    // still comes from this food's genuine native color property, not class0.
+    if(elemental_abilities0355::elemental(color)&&id==0x45B6&&score){
+        if(const auto props=properties(rdram,actor))return gain(rdram,food_class(*props,elemental_abilities0355::native_alias(color)),true);
+        return {};
+    }
+    if(auto elemental=elemental_abilities0355::food(color,id,score,native_class))return elemental;
     if(auto metal=metal_rewards0300::food(color,id,score,native_class))return metal;
+    // A real413A fire creature has an original food definition, but the
+    // native tongue refuses its flags. The separate causal tongue gate admits
+    // only Fire; never turn transient flame meshes into fake food actors.
+    if(color==elemental_abilities0355::fire&&id==0x413A&&properties(rdram,actor))return score&&no_enemy_score(rdram,actor)?0:1;
+    if(color==elemental_abilities0355::water){
+        const auto family=elemental_food_sources0355::food_family(id);
+        if(family!=elemental_abilities0355::FoodFamily::Unknown){
+            if(const auto props=properties(rdram,actor)){
+                if(family==elemental_abilities0355::FoodFamily::Penguin)return score&&no_enemy_score(rdram,actor)?0:2;
+                if(!score){const auto life=gain(rdram,food_class(*props,6),false);if(life>0&&life<=8)return life*3;}
+            }
+        }
+    }
     if(no_enemy_score(rdram,actor)){
         if(score)return 0;
         if(hybrid(color))return enemy_mean(rdram,*properties(rdram,actor),color,false);
         return {};
     }
-    if(auto gain=custom_gain(actor,color))return gain;
+    if(auto gain=custom_gain(rdram,actor,color))return gain;
     if(!hybrid(color))return {};
     if(fruit>=0)return color==8+unsigned(fruit)?std::optional<int>(4):std::nullopt;
     if(!enemy_food(id))return {};

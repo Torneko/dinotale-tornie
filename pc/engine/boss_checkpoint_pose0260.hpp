@@ -9,12 +9,12 @@ namespace n=boss_native;namespace inventory=boss_checkpoint_inventory0260;
 // depth44/8C and depth motionCC/D8/114 on the retained4001 actor. Store only
 // the stable native gameplay plane; XY still comes from the destination44CA.
 struct Payload {
- uint32_t player=0,z=0;unsigned activation_vi=0,native_color=8,pc_color=14;
+ uint32_t player=0,z=0;unsigned activation_vi=0,native_color=8,pc_color=18;
  bool operator==(const Payload&)const=default;
 };
 inline bool valid(const Payload& p){
- return inventory::pointer(p.player,0x1FC)&&p.activation_vi&&p.pc_color<14&&
-  p.native_color==(p.pc_color<8?p.pc_color:0)&&std::isfinite(std::bit_cast<float>(p.z));
+ return inventory::pointer(p.player,0x1FC)&&p.activation_vi&&p.pc_color<18&&
+  p.native_color==(yoshi_colors0300::native_alias(p.pc_color))&&std::isfinite(std::bit_cast<float>(p.z));
 }
 inline bool owner(const Payload& p,const inventory::Payload& i){
  return valid(p)&&inventory::valid(i)&&p.player==i.player&&p.activation_vi==i.activation_vi&&p.native_color==i.native_color&&p.pc_color==i.pc_color;

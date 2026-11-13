@@ -9,7 +9,7 @@
 #include <span>
 #include <string>
 namespace workshop::story_hard0330 {
-inline constexpr unsigned mode=6,all_yoshis=0xFFFF,all_worlds=63,unassigned=255;
+inline constexpr unsigned mode=6,base_yoshis=0xFFFF,all_yoshis=0x3FFFF,all_worlds=63,unassigned=255;
 inline constexpr uint32_t maximum_runs=1000000;
 inline constexpr const char* production_filename="pc-story-hard.json";
 inline constexpr const char* preview_filename="pc-story-hard-preview.json";
@@ -23,7 +23,7 @@ struct Run {
  uint64_t serial=0;
  Phase phase=Phase::Empty;
  unsigned owned=0,found=0,alive=0,ever_lost=0,worlds=0,claimed_levels=0;
- std::array<unsigned,16> yoshi_worlds{};
+ std::array<unsigned,18> yoshi_worlds{};
  std::array<unsigned,24> egg_choice{};
  std::array<unsigned,6> world_levels{};
  bool checkpoint_bound=false;
@@ -38,7 +38,7 @@ struct View {
  uint32_t runs_started=0,runs_won=0;
  unsigned completed=0;
  CompletionPolicy completion_policy=CompletionPolicy::Undecided;
- std::array<uint32_t,16> yoshi_wins{};
+ std::array<uint32_t,18> yoshi_wins{};
  bool solo_boss_route_entitled=false;
  std::string reason;
 };
@@ -56,6 +56,7 @@ public:
  bool new_run(const std::string& token,bool trusted_new_run);
  bool bind_checkpoint(const std::string& token,std::span<const uint8_t> continuation,bool trusted_save);
  bool resume_run(const std::string& token,std::span<const uint8_t> continuation,bool native_continuing);
+ bool reserve_elemental(unsigned level,unsigned color,const std::string& token,bool trusted_entry);
  std::optional<unsigned> egg_for(unsigned level,const std::string& token,bool trusted_entry);
  bool found_egg(unsigned level,unsigned color,const std::string& token,bool trusted_carry_finish);
  bool lose_yoshi(unsigned color,const std::string& token,bool trusted_death);
@@ -71,6 +72,7 @@ bool prepare(unsigned,const story_hard_access0330::Evidence&,bool preview_verifi
 bool new_run(const std::string&,bool trusted_new_run);
 bool bind_checkpoint(const std::string&,std::span<const uint8_t>,bool trusted_save);
 bool resume_run(const std::string&,std::span<const uint8_t>,bool native_continuing);
+bool reserve_elemental(unsigned,unsigned,const std::string&,bool trusted_entry);
 std::optional<unsigned> egg_for(unsigned,const std::string&,bool trusted_entry);
 bool found_egg(unsigned,unsigned,const std::string&,bool trusted_carry_finish);
 bool lose_yoshi(unsigned,const std::string&,bool trusted_death);

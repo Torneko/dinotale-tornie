@@ -169,7 +169,12 @@ inline bool bird_successor(uint8_t* rdram,unsigned slot,uint32_t old,uint64_t bi
  if(b.birth!=birth||!birth||!b.factory||!actor(rdram,old,0x4526)||word(rdram,old+0x1F4)!=b.private_data||word(rdram,old+0x168)!=b.resource||byte(rdram,old+0x17D)!=0||byte(rdram,old+0x165)!=1||byte(rdram,old+0x17C)||word(rdram,old+0x20)!=b.factory+0x1A08)return false;
  // 46804/45CAC installs the public35B4 initializer;44194 then queues
  // lifecycle1/state0. The native35B4 body runs only on the next actor update.
- const auto next=word(rdram,old+0x180);if(!actor(rdram,next,0x46DA)||word(rdram,next+0x180)||byte(rdram,next+0x17D)!=1||byte(rdram,next+0x18)!=0||word(rdram,next+0x20)!=b.factory+0x1B84||word(rdram,next+0x1F4))return false;
+ const auto next=word(rdram,old+0x180);if(!actor(rdram,next,0x46DA)||word(rdram,next+0x180)||byte(rdram,next+0x17D)!=1||byte(rdram,next+0x18)!=0||word(rdram,next+0x20)!=b.factory+0x1B84)return false;
+ // Native45CAC reuses pooled46DA storage without clearing private1F4.
+ // A queued initializer may therefore retain its previous allocation. Do
+ // not treat that old pointer as the new private identity: bind it only
+ // after the real35B4 initializer reaches active phase1/7 below.
+ const auto pending_private=word(rdram,next+0x1F4);if(pending_private&&!range(pending_private,12))return false;
  const auto resource=word(rdram,next+0x168);const auto child=MEM_HU(0x17E,boss_native::base(old)),count=MEM_HU(0x184,boss_native::base(next));
  if(!range(resource,0x48)||MEM_HU(0x3C,boss_native::base(resource))!=0x46DA||word(rdram,resource+0x40)!=b.factory||word(rdram,resource+0x44)!=b.factory+0x1B84||!count||count>20||child>=20||word(rdram,next+0x188+4*child)!=old)return false;
  for(unsigned other=0;other<encounter.birds;++other)if(other!=slot&&birds[other].actor==next)return false;

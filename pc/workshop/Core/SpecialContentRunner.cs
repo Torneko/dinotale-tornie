@@ -78,7 +78,7 @@ public sealed class SpecialContentRunner(string root) {
             }
             p+=header;int stride=b[7]=='1'?12:16;
             if(count is <1 or >149 || terrain is <0 or >65536 || routes<0 || routes>count || p+(long)count*stride+(long)terrain*8+(long)routes*20>b.Length)throw new InvalidDataException("Placements incomplets.");
-            for(int i=0;i<count;i++){ushort id=System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(b.AsSpan(p+i*stride));if(ObjectCatalog.IsSpecialBubble(id))found|=1;if(SpecialEditorObjects.IsEgg(id))found|=2;if(id is 0x4F38 or 0x4F39)found|=16;if(id==0x45E3)found|=4;}
+            for(int i=0;i<count;i++){ushort id=System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(b.AsSpan(p+i*stride));if(ObjectCatalog.IsSpecialBubble(id))found|=1;if(SpecialEditorObjects.IsEgg(id))found|=2;if(id is 0x4F38 or 0x4F39)found|=16;if(id is 0x4F3A or 0x4F3B)found|=32;if(id==0x45E3)found|=4;}
             p+=count*stride+terrain*8;var seen=new HashSet<int>();
             for(int i=0;i<routes;i++){
                 int index=Word(0),flags=Word(8);if(index<0 || index>=count || !seen.Add(index) || flags is not (0 or 1) || flags==0 && (Word(12)!=0 || Word(16)!=0) || flags==1 && (!NavigationEditing.ValidCoordinate(BitConverter.Int32BitsToSingle(Word(12))) || !NavigationEditing.ValidCoordinate(BitConverter.Int32BitsToSingle(Word(16)))))throw new InvalidDataException("Arrivée de passage invalide.");p+=20;
@@ -103,6 +103,7 @@ public sealed class SpecialContentRunner(string root) {
             if((features&4)!=0 && (!manifest.RootElement.TryGetProperty("nativeBlackCarrierEditor",out var carriers) || carriers.ValueKind!=JsonValueKind.True))throw new InvalidDataException("Le Maskass volant noir seul nécessite le moteur 0.20.0 ou plus récent.");
             if((features&2)!=0 && (!manifest.RootElement.TryGetProperty("editorSpecialEggs",out var eggs) || eggs.ValueKind!=JsonValueKind.True))throw new InvalidDataException("Les œufs spéciaux nécessitent le moteur 0.20.0 ou plus récent.");
             if((features&16)!=0)RequireMetallicPlacements(manifest.RootElement);
+            if((features&32)!=0)RequireElementalPlacements(manifest.RootElement);
             if((features&1)!=0 && (!manifest.RootElement.TryGetProperty("specialFruitBubbles",out var bubbles) || bubbles.ValueKind!=JsonValueKind.True))throw new InvalidDataException("Les fruits spéciaux en bulle nécessitent le moteur 0.17.0 ou plus récent.");
             if(placements[7]>='4' && (!mval(manifest.RootElement,out int version4) || version4<4))throw new InvalidDataException("Le terrain modifié nécessite le moteur 0.16.0 ou plus récent.");
             if(placements[7]=='3' && (!mval(manifest.RootElement,out int version3) || version3<3))throw new InvalidDataException("Cette création à plusieurs salles nécessite le moteur 0.14.0.");
@@ -146,13 +147,17 @@ public sealed class SpecialContentRunner(string root) {
         if(!manifest.TryGetProperty("editorMetallicPlacements",out var supported)||supported.ValueKind!=JsonValueKind.True)throw new InvalidDataException("Les œufs et les Yoshis or/argent personnalisés nécessitent le moteur 0.31.1 ou plus récent.");
     }
 
+    static void RequireElementalPlacements(JsonElement manifest){
+        if(!manifest.TryGetProperty("editorElementalPlacements",out var supported)||supported.ValueKind!=JsonValueKind.True)throw new InvalidDataException("Les œufs et les Yoshis feu/eau personnalisés nécessitent le moteur 0.35.5 ou plus récent.");
+    }
+
     // Pure launch construction: capability/argument checks can be reviewed and
     // tested without starting a game. LaunchPrepared owns the actual process.
     public ProcessStartInfo PreparedStartInfo(string profile,string? token=null,bool continuation=false,int preferred=-1,IEnumerable<string>? diagnosticArgs=null){
 
         if(IsRunning)throw new InvalidOperationException("Une session est déjà ouverte.");
-        if(preferred is <-1 or >15)throw new InvalidDataException("Couleur de Yoshi personnalisée invalide.");
-        if(preferred>=14){using var manifest=JsonDocument.Parse(File.ReadAllText(Path.Combine(RuntimeDirectory,"engine-build.json")));RequireMetallicPlacements(manifest.RootElement);}
+        if(preferred is <-1 or >17)throw new InvalidDataException("Couleur de Yoshi personnalisée invalide.");
+        if(preferred>=14){using var manifest=JsonDocument.Parse(File.ReadAllText(Path.Combine(RuntimeDirectory,"engine-build.json")));if(preferred>=16)RequireElementalPlacements(manifest.RootElement);else RequireMetallicPlacements(manifest.RootElement);}
 
         string allowed=Path.GetFullPath(Path.Combine(root,"profiles"))+Path.DirectorySeparatorChar;
 
@@ -188,14 +193,16 @@ public sealed class SpecialContentRunner(string root) {
 
 
 public static class SpecialSaveSeed {
-    static readonly string[] NewJournals=["pc-metal-yoshis.json","pc-hybrid-completion.json"];
+    static readonly string[] NewJournals=["pc-metal-yoshis.json","pc-hybrid-completion.json","pc-elemental-yoshis.json"];
     static bool Natural(JsonElement root,string name,uint maximum,out uint value){value=0;return root.TryGetProperty(name,out var property)&&property.ValueKind==JsonValueKind.Number&&property.TryGetUInt32(out value)&&value<=maximum;}
     static void ValidateJournal(string name,byte[] bytes){
         try{
             using var json=JsonDocument.Parse(bytes,new JsonDocumentOptions{MaxDepth=8});var root=json.RootElement;
             if(root.ValueKind!=JsonValueKind.Object)throw new InvalidDataException();var properties=root.EnumerateObject().ToArray();
-            if(properties.Select(p=>p.Name).Distinct(StringComparer.Ordinal).Count()!=properties.Length||!Natural(root,"schema",1,out uint schema)||schema!=1)throw new InvalidDataException();
-            if(name=="pc-metal-yoshis.json"){
+            if(properties.Select(p=>p.Name).Distinct(StringComparer.Ordinal).Count()!=properties.Length||!Natural(root,"schema",name=="pc-elemental-yoshis.json"?2u:1u,out uint schema)||schema<1)throw new InvalidDataException();
+            if(name=="pc-elemental-yoshis.json"){
+                if(properties.Length!=(schema==1?3:4)||!Natural(root,"foundMask",3,out uint elementalFound)||!Natural(root,"storyAliveMask",3,out uint elementalAlive)||(elementalAlive&~elementalFound)!=0||schema==2&&(!Natural(root,"hybridAliveMask",3,out uint hybridAlive)||(hybridAlive&~elementalFound)!=0))throw new InvalidDataException();
+            }else if(name=="pc-metal-yoshis.json"){
                 if(properties.Length!=3||!Natural(root,"foundMask",3,out uint found)||!Natural(root,"storyAliveMask",3,out uint alive)||(alive&~found)!=0)throw new InvalidDataException();
             }else{
                 if(properties.Length!=5||!Natural(root,"observedMask",0xFFFFFF,out _)||!Natural(root,"legacyMask",0xFFFFFF,out uint legacy)||!root.TryGetProperty("legacyChecked",out var check)||check.ValueKind is not (JsonValueKind.True or JsonValueKind.False)||!root.TryGetProperty("legacyChecksum",out var checksum))throw new InvalidDataException();

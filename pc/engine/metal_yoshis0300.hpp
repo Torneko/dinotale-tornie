@@ -23,6 +23,9 @@ unsigned story_extra(bool continuing);
 // Called only after the exact carried native egg reaches a successful tally.
 // The acquisition caller owns that proof; this service owns atomic persistence.
 bool acquire(unsigned pc_color);
+// Re-read under the journal lock for recovery of an already-owned colour.
+// Never grants ownership or writes the journal, even after external changes.
+bool confirm_owned(unsigned pc_color);
 // Root supplies the current TWO-bit live field at genuine Story save/death
 // fences. Native EEPROM's six legacy lives and codec bytes remain unchanged.
 bool save_story_alive(unsigned two_bits);

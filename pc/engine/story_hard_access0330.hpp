@@ -17,12 +17,10 @@ struct Evidence {
 // Purchases, Story alive flags and mere eligibility never grant ownership.
 std::optional<unsigned> owned(const story_rights0320::View& canonical,
  const finds::View& hybrids,const metal_yoshis0300::View& metals);
-// Pure policy for a future validated16-color native evidence adapter. This
-// module has NO16-color file protocol or writer and manufactures no victories.
+// Genuine16-color evidence requires the strict schema2 Boss ledger. Schema1
+// receipts remain readable at width14; no Gold/Silver victories are invented.
 bool entitled(const Evidence& evidence);
-// Strict READ-ONLY legacy schema1 reader: evidence width is0 or14, never16.
-// Current production evidence therefore cannot open Story Hard, including a
-// complete0x3FFF legacy ledger. Private QA authorization is a separate concern.
+// Read-only schema1/schema2 inspection; no migration or file is written here.
 Evidence inspect(const story_rights0320::View& canonical,
  const finds::View& hybrids,const metal_yoshis0300::View& metals,
  const std::filesystem::path& boss_file="pc-boss-challenges.json");

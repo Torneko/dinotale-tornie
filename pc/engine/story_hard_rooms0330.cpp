@@ -72,7 +72,8 @@ Applied apply(std::span<const uint8_t> original){
   const float ax=std::bit_cast<float>(anchor->x),ay=std::bit_cast<float>(anchor->y);
   //5-3 enters atY504 along the top of its existing page. Put its bubble
   //40units below that entrance; all23 Warp4 anchors use the40unit rise.
-  uint32_t x=std::bit_cast<uint32_t>(ax+32.0f),y=std::bit_cast<uint32_t>(ay+(level==18?-40.0f:40.0f));
+  const bool elemental_end=level==5||level==11;
+  uint32_t x=std::bit_cast<uint32_t>(ax+(elemental_end?-56.0f:32.0f)),y=std::bit_cast<uint32_t>(ay+(level==18?-40.0f:elemental_end?24.0f:40.0f));
   if(!native.within_terrain(anchor->room,{x,y}))x=std::bit_cast<uint32_t>(ax-32.0f);
   require(navigation::coordinate(x)&&navigation::coordinate(y)&&native.within_terrain(anchor->room,{x,y}),"Hard bubble must remain inside an existing terrain page");
   const size_t objects=align16(cursor),meta=align16(objects+size_t(source.count+1)*12),header=align16(meta+12),end=align16(header+0x118);

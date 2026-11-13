@@ -9,15 +9,30 @@ extern "C" void workshop_request_native_history_test(unsigned);
 #include "collections.hpp"
 #include "hybrid_mode.hpp"
 #include "game_modes0320.hpp"
+#include "bonus_game0352.hpp"
+#include "bonus_team0353.hpp"
 #include "story_hybrid0320.hpp"
 #include "story_rights0320.hpp"
+#include "known_yoshis_runtime0355.hpp"
+#include "locked_selection_native0355.hpp"
 #include "story_observer0320.hpp"
 #include "story_hard_bridge0330.hpp"
 #include "hybrid_completion0290.hpp"
 #include "metal_yoshis0300.hpp"
 #include "metal_native0300.hpp"
 #include "metal_custom0311.hpp"
+#include "boss_metals0354.hpp"
 #include "gold_silver_resources0300.hpp"
+#include "elemental_resources0355.hpp"
+#include "unknown_yoshi_resources0355.hpp"
+#include "elemental_yoshis0355.hpp"
+#include "elemental_abilities0355.hpp"
+#include "elemental_native0355.hpp"
+#include "elemental_contact0355.hpp"
+#include "elemental_tongue0355.hpp"
+#include "elemental_flame_food0355.hpp"
+#include "elemental_lava0355.hpp"
+#include "elemental_selection_capacity0355.hpp"
 #include "hybrid_finds.hpp"
 #include "hybrid_pickup_sound.hpp"
 #include "workshop_data.hpp"
@@ -54,6 +69,9 @@ extern "C" void workshop_request_native_history_test(unsigned);
 #include "custom_passages.hpp"
 #include "heart_shop0283.hpp"
 #include "heart_pickup0283.hpp"
+#include "trial_special_lives0350.hpp"
+#include "trial_special_native0350.hpp"
+#include <map>
 #ifdef WORKSHOP_NATIVE_COOP
 #include "coop_native_bridge.hpp"
 #include "coop_room_route_driver0280.hpp"
@@ -158,6 +176,8 @@ bool background_test=false,trace_startup=false;
 bool test_software_gpu0284=false;
 bool test_book_resume=false;
 bool test_book_shop=false;
+bool bonus_preview0352=false,bonus_route0353=false,bonus_complete0353=false,bonus_selection0353=false,bonus_new0353=false;
+unsigned bonus_page0353=1;uint64_t bonus_seed0353=24;
 bool hard_preview0330=false;int hard_test_egg0330=-1;bool hard_qa_room_routed0330=false;std::atomic_bool hard_continue_refused0330{false};
 bool test_find_reveal=false;
 bool test_editor_eggs=false,test_editor_picked=false,test_editor_probe_logged=false;
@@ -198,7 +218,7 @@ workshop::starting_bonus0283::Controller starting_bonus;
 static workshop::starting_bonus0283::Environment starting_bonus_environment(uint8_t* ram){
     namespace sb=workshop::starting_bonus0283;
     sb::Environment e;e.vi=test_vi.load();
-    e.custom=!payload.empty() || workshop::custom_session::active() || test_tally || test_coop_native || workshop::boss_solo0240::enabled || hard_preview0330;
+    e.custom=workshop::bonus_game0352::active() || !payload.empty() || workshop::custom_session::active() || test_tally || test_coop_native || workshop::boss_solo0240::enabled || hard_preview0330;
     if(e.custom){e.mode=sb::Mode::Custom;return e;}
     if(workshop::boss_campaign0250::enabled){
         const auto& state=workshop::boss_campaign0250::session.snapshot();
@@ -240,6 +260,7 @@ float auto_x=0,auto_y=0;
 uint16_t auto_buttons=0;
 bool ram_pointer(uint32_t a){return a>=0x80000400 && a<0x80800000;}
 void select_test_color(unsigned frame,uint16_t* buttons,float* x,float* y){
+    workshop::bonus_game0352::navigation(diagnostic_rdram,frame,buttons,x,y);
     if(test_stage>=0 && diagnostic_rdram && frame>=1700 && frame<2400){
         auto* rdram=diagnostic_rdram;
         MEM_B(0,gpr(int32_t(0x800F8DFC)))=test_stage/4;
@@ -274,7 +295,7 @@ void select_test_color(unsigned frame,uint16_t* buttons,float* x,float* y){
     }
     auto* rdram=diagnostic_rdram;
     auto read=[&](uint32_t a){return uint32_t(MEM_W(0,int32_t(a)));};
-    auto is_yoshi=[&](uint32_t a){auto id=read(a+12)>>16;return (id>=0x41F1 && id<=0x41F8)||(id>=0x4EF1 && id<=0x4EF8);};
+    auto is_yoshi=[&](uint32_t a){auto id=read(a+12)>>16;return (id>=0x41F1 && id<=0x41F8)||(id>=0x4EF1 && id<=0x4EFA);};
     auto player=read(0x800F8828);if(ram_pointer(player) && read(player+12)>>16==0x4001)return;
     if(frame<=auto_end){*buttons=auto_buttons;*x=auto_x;*y=auto_y;return;}
     if(frame<auto_next)return;auto_next=frame+90;
@@ -289,8 +310,8 @@ void select_test_color(unsigned frame,uint16_t* buttons,float* x,float* y){
     else {
         auto background=read(current+0x180);if(!ram_pointer(background))return;
         unsigned count=read(background+0x184)>>16;if(count>26)return;
-        std::array<float,16> px{},py{};int size=0,source=-1,target=-1;
-        for(unsigned i=0;i<count && size<16;i++){
+        std::array<float,18> px{},py{};int size=0,source=-1,target=-1;
+        for(unsigned i=0;i<count && size<18;i++){
             auto object=read(background+0x188+i*4);if(!ram_pointer(object)||!is_yoshi(object))continue;
             px[size]=std::bit_cast<float>(read(object+60));py[size]=std::bit_cast<float>(read(object+64));
             if(object==current)source=size;if(int(read(object+12)&255)==selected_color)target=size;size++;
@@ -299,7 +320,7 @@ void select_test_color(unsigned frame,uint16_t* buttons,float* x,float* y){
             if(target<0 && selected_color>=14 && test_color<0 && workshop::custom_session::active())workshop::custom_session::release_preferred_color();
             return;
         }
-        std::array<int,16> previous{},first{},queue{};previous.fill(-1);previous[source]=source;first[source]=-1;
+        std::array<int,18> previous{},first{},queue{};previous.fill(-1);previous[source]=source;first[source]=-1;
         int head=0,tail=0;queue[tail++]=source;
         while(head<tail && previous[target]<0){
             int node=queue[head++];
@@ -653,7 +674,7 @@ extern "C" void workshop_807F1600(uint8_t* rdram,recomp_context*) {
 #ifdef WORKSHOP_SPECIAL_CONTENT
 extern "C" void func_8006988C(uint8_t* rdram,recomp_context* ctx);
 static bool metal_solo_scope(){
-    bool allowed=payload.empty()&&!workshop::custom_session::active()&&!test_tally;
+    bool allowed=!workshop::bonus_game0352::active()&&payload.empty()&&!workshop::custom_session::active()&&!test_tally;
 #ifdef WORKSHOP_NATIVE_COOP
     allowed=allowed&&!test_coop_native&&!workshop::boss_solo0240::enabled&&!workshop::boss_campaign0250::enabled;
 #endif
@@ -666,11 +687,149 @@ static bool metal_custom_scope0311(){
 #endif
     return workshop::metal_custom0311::scope(!payload.empty(),workshop::custom_session::active(),test_tally,deferred);
 }
-static bool metal_play_scope0311(){return metal_solo_scope()||metal_custom_scope0311();}
-static unsigned metal_available_extra0311(){
+static bool metal_boss_scope0354(){
+#ifdef WORKSHOP_NATIVE_COOP
+ return workshop::boss_metals0354::scope(workshop::boss_solo0240::enabled||workshop::boss_campaign0250::enabled,test_coop_native,!payload.empty(),workshop::custom_session::active(),test_tally);
+#else
+ return false;
+#endif
+}
+static bool metal_play_scope0311(){return workshop::bonus_game0352::active()||metal_boss_scope0354()||metal_solo_scope()||metal_custom_scope0311();}
+// These two extra lives never share the aliased native White/Black life bits.
+static bool elemental_solo_scope0355(){
+ bool allowed=!test_tally;
+#ifdef WORKSHOP_NATIVE_COOP
+ allowed=allowed&&!test_coop_native;
+#endif
+ return allowed&&(story_hard_session0330()||metal_play_scope0311());
+}
+static unsigned elemental_owned_extra0355(){
+ const auto v=workshop::elemental_yoshis0355::view();
+ return elemental_solo_scope0355()&&v.initialized&&v.readable&&v.saved?(v.found&3u)<<8:0;
+}
+static void elemental_save_lives0355(uint8_t* rdram){
+ if(rdram&&metal_solo_scope()&&workshop::metal_native0300::story(rdram))
+  workshop::elemental_yoshis0355::save_story_alive((workshop::metal_native0300::extras(rdram)>>8)&3u);
+}
+static workshop::elemental_contact0355::Tracker elemental_contacts0355;
+struct ElementalTongueDraw0355 {uint64_t token=0;workshop::elemental_tongue0355::Ticket ticket;};
+static std::vector<ElementalTongueDraw0355> elemental_tongue_draws0355;
+static uint64_t elemental_tongue_serial0355=0;
+extern "C" uint64_t workshop_elemental_tongue_begin0355(uint8_t* rdram,uint32_t actor){
+    if(!elemental_solo_scope0355()||elemental_tongue_draws0355.size()>=32)return 0;
+    // Allocate the host slot before changing either guest palette pointer.
+    if(++elemental_tongue_serial0355==0)++elemental_tongue_serial0355;
+    elemental_tongue_draws0355.push_back({elemental_tongue_serial0355,{}});
+    auto& draw=elemental_tongue_draws0355.back();draw.ticket=workshop::elemental_tongue0355::begin(rdram,actor,true);
+    if(!draw.ticket.active){elemental_tongue_draws0355.pop_back();return 0;}
+    return draw.token;
+}
+extern "C" void workshop_elemental_tongue_end0355(uint8_t* rdram,uint64_t token)noexcept{
+    if(!token||elemental_tongue_draws0355.empty()||elemental_tongue_draws0355.back().token!=token)return;
+    workshop::elemental_tongue0355::finish(rdram,elemental_tongue_draws0355.back().ticket);elemental_tongue_draws0355.pop_back();
+}
+
+extern "C" void workshop_elemental_hit_begin0355(uint8_t* rdram,recomp_context* ctx){elemental_contacts0355.begin(rdram,ctx,elemental_solo_scope0355(),uint32_t(section_addresses[19]),uint32_t(section_addresses[20]),uint32_t(section_addresses[130]),uint32_t(section_addresses[88]),uint32_t(section_addresses[207]));}
+extern "C" void workshop_elemental_hit_end0355(uint8_t* rdram,recomp_context* ctx){elemental_contacts0355.end(rdram,ctx);}
+extern "C" int workshop_elemental_hit_loss0355(uint8_t* rdram,recomp_context* ctx){return elemental_solo_scope0355()?elemental_contacts0355.loss(rdram,ctx):3;}
+extern "C" void workshop_elemental_flame_food_gate0355(uint8_t* rdram,recomp_context* ctx){
+    const auto player=uint32_t(MEM_W(0,int32_t(0x800F8828)));
+    workshop::elemental_flame_food0355::gate(rdram,ctx,elemental_solo_scope0355(),uint32_t(section_addresses[88]),elemental_contacts0355.birth(player),elemental_contacts0355.birth(uint32_t(ctx->r16)));
+}
+extern "C" void func_804A1398(uint8_t*,recomp_context*);
+extern "C" void workshop_locked_selection_partition0355(uint8_t* rdram,recomp_context* ctx){workshop::locked_selection_native0355::prepare_children(rdram,ctx);}
+extern "C" int workshop_locked_selection_confirm0355(uint8_t* rdram,recomp_context* ctx){return workshop::locked_selection_native0355::confirm(rdram,ctx);}
+extern "C" int workshop_locked_selection_static0355(uint8_t* rdram,recomp_context* ctx){
+ const auto state=workshop::locked_selection_native0355::initialize(rdram,ctx,uint32_t(section_addresses[57]));
+ if(state==workshop::locked_selection_native0355::Init::not_question)return 0;
+ if(state==workshop::locked_selection_native0355::Init::ready){const auto saved=*ctx;func_804A1398(rdram,ctx);*ctx=saved;}
+ return 1;
+}
+extern "C" int workshop_selection_unknown0355(unsigned color){
+ return color<18&&!workshop::known_yoshis_runtime0355::snapshot().known(color);
+}
+extern "C" int workshop_locked_selection_node0355(uint8_t* rdram,uint32_t actor){return workshop::locked_selection_native0355::node(rdram,actor);}
+extern "C" void workshop_selection_begin0355(uint8_t*,recomp_context*){
+ workshop::known_yoshis_runtime0355::canonical(workshop::story_rights0320::read(recomp::get_config_path()/"saves"/"yoshisstory.n64.us.bin"));
+}
+extern "C" void workshop_elemental_selection_capacity0355(uint8_t* rdram,recomp_context* ctx){workshop::elemental_selection_capacity0355::clamp_white_icons(rdram,ctx);}
+extern "C" uint32_t workshop_elemental_terrain_word(uint8_t* rdram,uint32_t actor,uint32_t raw){return workshop::elemental_lava0355::terrain_word(rdram,actor,raw,elemental_solo_scope0355());}
+extern "C" void workshop_water_swim0355(uint8_t* rdram,recomp_context* ctx){workshop::elemental_native0355::swim_target(rdram,ctx,elemental_solo_scope0355());}
+static workshop::trial_special_lives0350::Store trial_special_store0350;
+struct TrialPendingLoss0350 {unsigned mask=0,last_retry_vi=0;};
+static std::mutex trial_pending_mutex0350;
+static std::map<std::filesystem::path,TrialPendingLoss0350> trial_pending_by_profile0350;
+static std::filesystem::path trial_special_profile0350;
+static TrialPendingLoss0350 trial_special_pending0350(){
+    std::lock_guard guard(trial_pending_mutex0350);return trial_pending_by_profile0350[trial_special_profile0350];
+}
+static void trial_special_pending_update0350(unsigned color,bool pending){
+    std::lock_guard guard(trial_pending_mutex0350);auto& state=trial_pending_by_profile0350[trial_special_profile0350];
+    if(pending)state.mask|=1u<<color;else state.mask&=~(1u<<color);
+    state.last_retry_vi=test_vi.load();
+}
+static bool trial_special_scope0350(uint8_t* rdram){
+    if(!rdram)return false;
+    const int native=MEM_W(0,int32_t(0x800F8B88));
+    const int selected=workshop_menu_enabled()?workshop_menu_session_mode():end_test_vi?(test_hybrid?3:1):(native==1?1:-1);
+    return workshop::trial_special_native0350::scope(metal_solo_scope(),selected,native);
+}
+static unsigned trial_special_blocked0350(uint8_t* rdram){
+    return trial_special_scope0350(rdram)?trial_special_store0350.snapshot().blocked_mask()|trial_special_pending0350().mask:0;
+}
+static void trial_special_retry0350(uint8_t* rdram){
+    if(!trial_special_scope0350(rdram))return;
+    const auto pending=trial_special_pending0350();const unsigned frame=test_vi.load();
+    if(!pending.mask||frame-pending.last_retry_vi<60)return;
+    {std::lock_guard guard(trial_pending_mutex0350);trial_pending_by_profile0350[trial_special_profile0350].last_retry_vi=frame;}
+    trial_special_store0350.refresh();
+    for(unsigned color:{6u,7u,14u,15u})if(pending.mask&(1u<<color)){
+        if(trial_special_store0350.lose(color).accepted())trial_special_pending_update0350(color,false);
+    }
+}
+static void trial_special_project0350(uint8_t* rdram){
+    if(!trial_special_scope0350(rdram))return;
+    trial_special_retry0350(rdram);
+    workshop::trial_special_native0350::project(rdram,trial_special_blocked0350(rdram));
+}
+static unsigned trial_special_recovery_metals0350(uint8_t* rdram){
+    if(!trial_special_scope0350(rdram))return 0;
+    const auto state=trial_special_store0350.snapshot();
+    if(!state.readable||!state.last_write_succeeded)return 0;
+    return workshop::trial_special_native0350::metal_extras(state.lost_mask)&(workshop::metal_yoshis0300::view().found<<6);
+}
+static bool trial_special_owned0350(uint8_t* rdram,unsigned color){
+    if(color==14||color==15)return (workshop::metal_yoshis0300::view().found&(1u<<(color-14)))!=0;
+    if(color!=6&&color!=7)return false;
+    const auto p=workshop::progress::read(rdram,gpr(int32_t(0x807F2000)));
+    const auto story=uint32_t(MEM_W(0,int32_t(0x800F8E5C)))&0xFFFFFFu;
+    return workshop::progress::valid(p,story)&&p.trial==0xFFFFFFu&&(p.eggs&(1u<<(color-6)));
+}
+static void trial_special_death0350(uint8_t* rdram,unsigned color){
+    if(!trial_special_scope0350(rdram)||!workshop::trial_special_lives0350::special(color)||!trial_special_owned0350(rdram,color))return;
+    trial_special_pending_update0350(color,true);
+    const auto result=trial_special_store0350.lose(color);
+    if(result.accepted())trial_special_pending_update0350(color,false);
+    trial_special_project0350(rdram);
+    fprintf(stderr,"[TrialSpecial0350] death pc=%u lost=%04X saved=%u ownershipChanged=0\n",color,result.lost_mask,unsigned(result.accepted()));
+}
+static void trial_special_recover0350(uint8_t* rdram,unsigned pc_mask){
+    if(!trial_special_scope0350(rdram))return;
+    const auto state=trial_special_store0350.snapshot();
+    if(!state.readable||!state.last_write_succeeded)return;
+    for(unsigned color:{6u,7u,14u,15u})if((pc_mask&state.lost_mask&(1u<<color))&&trial_special_owned0350(rdram,color)){
+        const auto result=trial_special_store0350.recover(color);
+        if(result.accepted())trial_special_pending_update0350(color,false);
+        fprintf(stderr,"[TrialSpecial0350] egg-finished pc=%u lost=%04X saved=%u ownershipChanged=0\n",color,result.lost_mask,unsigned(result.accepted()));
+    }
+}
+static unsigned metal_available_extra0311(uint8_t* rdram){
+    if(workshop::bonus_game0352::active())return (workshop::bonus_game0352::team_available(rdram)>>8)&0x3C0u;
+    if(metal_boss_scope0354())return workshop::boss_metals0354::available_extra(workshop::metal_yoshis0300::view())|elemental_owned_extra0355();
     // Search/acquisition/Story writes still use ONLY the canonical gate.
     workshop::metal_yoshis0300::set_scope(metal_solo_scope());
-    return metal_custom_scope0311()?workshop::metal_custom0311::owned_extra(workshop::metal_yoshis0300::view()):workshop::metal_yoshis0300::unlocked_extra();
+    const unsigned owned=metal_custom_scope0311()?workshop::metal_custom0311::owned_extra(workshop::metal_yoshis0300::view()):workshop::metal_yoshis0300::unlocked_extra();
+    return (owned&~workshop::trial_special_native0350::metal_extras(trial_special_blocked0350(rdram)))|elemental_owned_extra0355();
 }
 static uint32_t story_clears(uint8_t* rdram){
     if(progress_payload)return uint32_t(MEM_W(0,static_cast<gpr>(static_cast<int32_t>(progress_payload))))&0xFFFFFF;
@@ -681,8 +840,9 @@ extern "C" int workshop_progress_valid(uint8_t* rdram,recomp_context* ctx){
     if(!ram_pointer(uint32_t(ctx->r4)))return 0;
     return workshop::progress::valid(workshop::progress::read(rdram,ctx->r4),story_clears(rdram));
 }
-extern "C" int workshop_progress_trial_access(uint8_t* rdram){return story_clears(rdram)==0xFFFFFF;}
+extern "C" int workshop_progress_trial_access(uint8_t* rdram){return workshop::bonus_game0352::active()||story_clears(rdram)==0xFFFFFF;}
 extern "C" int workshop_progress_trial(uint8_t* rdram,recomp_context* ctx){
+    if(workshop::bonus_game0352::active()){ctx->r2=0;return 1;}
     // A Story reward belongs to this same column when Trial catches up.
     // Keep its color instead of drawing a second reward for the same column.
     if(!ram_pointer(uint32_t(ctx->r4)) || ctx->r5>=6 || ctx->r6>=4)return 0;
@@ -696,6 +856,7 @@ extern "C" int workshop_progress_trial(uint8_t* rdram,recomp_context* ctx){
 }
 extern "C" void workshop_progress_read_begin(uint8_t*,recomp_context* ctx){progress_payload=uint32_t(ctx->r4);progress_reading=true;}
 extern "C" void workshop_progress_read_end(uint8_t* rdram,recomp_context*){
+    if(workshop::bonus_game0352::active()){workshop::bonus_game0352::native_course_access(rdram);progress_payload=0;progress_reading=false;return;}
     progress_boot_story=story_clears(rdram);
     if(story_hard_session0330()){progress_payload=0;return;}
     if(story_hybrid_session0320())workshop::finds::migrate(rdram,canonical_rights0320.progression,canonical_rights0320.story,canonical_rights0320.present&&canonical_rights0320.readable);
@@ -724,11 +885,12 @@ static unsigned reconcile_story(uint8_t* rdram){
     return added;
 }
 extern "C" void workshop_progress_reconcile(uint8_t* rdram,recomp_context*){
+    if(workshop::bonus_game0352::active())return;
     if(story_hard_session0330())return;
     if(story_hybrid_session0320()){
-        if(story_lives_ready0320&&workshop::metal_native0300::story(rdram))workshop::story_hybrid0320::save_lives((workshop::metal_native0300::extras(rdram)>>6)&3);return;
+        if(story_lives_ready0320&&workshop::metal_native0300::story(rdram)){workshop::story_hybrid0320::save_lives((workshop::metal_native0300::extras(rdram)>>6)&3);elemental_save_lives0355(rdram);}return;
     }
-    reconcile_story(rdram);if(metal_solo_scope())workshop::metal_native0300::save_story(rdram);
+    reconcile_story(rdram);if(metal_solo_scope()){workshop::metal_native0300::save_story(rdram);elemental_save_lives0355(rdram);}
 }
 extern "C" int workshop_story_event0320(){return story_hybrid_session0320()||story_hard_session0330();}
 extern "C" void workshop_hard_init0330(uint8_t* r,recomp_context* c){if(story_hard_session0330())workshop::story_hard_bridge0330::init_projection(r,c);}
@@ -766,45 +928,77 @@ static void story_world_receipt0320(std::optional<unsigned> world){
 }
 extern "C" void workshop_story_world_arm0320(uint8_t* rdram,recomp_context* context){if(story_hard_session0330()){workshop::story_hard_bridge0330::arm_world(rdram,context);return;}story_observer0320.arm_world_save(rdram,context);}
 extern "C" void workshop_story_world_commit0320(uint8_t* rdram,recomp_context* context){if(story_hard_session0330()){workshop::story_hard_bridge0330::commit_world(rdram,context);return;}story_world_receipt0320(story_observer0320.finish_world_save(rdram,context));}
-extern "C" void workshop_story_bowser_arm0320(uint8_t* rdram,recomp_context* context){if(story_hard_session0330()){workshop::story_hard_bridge0330::arm_bowser(rdram,context);return;}story_observer0320.arm_bowser(rdram,context);}
-extern "C" void workshop_story_bowser_commit0320(uint8_t* rdram,recomp_context* context){if(story_hard_session0330()){workshop::story_hard_bridge0330::commit_bowser(rdram,context);return;}story_world_receipt0320(story_observer0320.finish_bowser(rdram,context));}
+extern "C" void workshop_story_bowser_arm0320(uint8_t* rdram,recomp_context* context){if(workshop::bonus_game0352::active()){workshop::bonus_game0352::bowser_arm(rdram,context);return;}if(story_hard_session0330()){workshop::story_hard_bridge0330::arm_bowser(rdram,context);return;}story_observer0320.arm_bowser(rdram,context);}
+extern "C" void workshop_story_bowser_commit0320(uint8_t* rdram,recomp_context* context){if(workshop::bonus_game0352::active()){workshop::bonus_game0352::bowser_commit(rdram,context);return;}if(story_hard_session0330()){workshop::story_hard_bridge0330::commit_bowser(rdram,context);return;}story_world_receipt0320(story_observer0320.finish_bowser(rdram,context));}
 extern "C" unsigned workshop_find_unlocked(uint8_t* rdram){
+    if(workshop::bonus_game0352::active())return workshop::bonus_game0352::team_available(rdram)>>8;
     if(story_hard_session0330())return workshop::story_hard_bridge0330::unlocked_extras();
     if(story_hybrid_session0320()){
         const auto found=workshop::finds::view();
-        return found.initialized&&found.readable&&found.migrated&&found.saved?(found.found&63)|metal_available_extra0311():0;
+        return found.initialized&&found.readable&&found.migrated&&found.saved?(found.found&63)|metal_available_extra0311(rdram):0;
     }
     const auto p=workshop::progress::read(rdram,gpr(int32_t(0x807F2000)));
     const auto story=story_clears(rdram);
     if(!workshop::progress::valid(p,story))return 0;
     workshop::finds::migrate(rdram,story);
-    return workshop::finds::available(workshop::progress::unlocked(p,story)|workshop::story_hybrid0320::view().acquired)|metal_available_extra0311();
+    return workshop::finds::available(workshop::progress::unlocked(p,story)|workshop::story_hybrid0320::view().acquired)|metal_available_extra0311(rdram);
 }
-extern "C" void workshop_find_reset(){if(!story_hard_session0330())workshop::finds::reset_attempt();}
+extern "C" void workshop_find_reset(){if(!workshop::bonus_game0352::active()&&!story_hard_session0330())workshop::finds::reset_attempt();}
 extern "C" void workshop_find_clear(){
+    if(workshop::bonus_game0352::active())return;
     if(story_hard_session0330()){workshop::story_hard_bridge0330::clear_local();return;}
     if(story_hybrid_session0320()){
         story_lives_ready0320=false;workshop::finds::reset_attempt();workshop::story_hybrid0320::reset_run(workshop::metal_yoshis0300::view().found);return;
     }
-    workshop::finds::clear_save();if(!metal_custom_scope0311())workshop::metal_yoshis0300::clear_save();
+    workshop::finds::clear_save();if(!metal_custom_scope0311()){workshop::metal_yoshis0300::clear_save();workshop::elemental_yoshis0355::clear_save();}
 }
-extern "C" int workshop_metal_trial_color(uint8_t*,recomp_context* ctx){
-    if(story_hard_session0330()){const unsigned color=uint32_t(ctx->r5);ctx->r2=color<16?(workshop::story_hard_bridge0330::available().value_or(0)>>color)&1:0;return 1;}
-    const unsigned color=uint32_t(ctx->r5);if(!workshop::yoshi_colors0300::metal(color))return 0;
-    ctx->r2=(metal_available_extra0311()>>(color-8))&1;return 1;
+extern "C" int workshop_metal_trial_color(uint8_t* rdram,recomp_context* ctx){
+    if(workshop::bonus_game0352::active()){const unsigned color=uint32_t(ctx->r5);ctx->r2=color<18?(workshop::bonus_game0352::team_available(rdram)>>color)&1u:0u;return 1;}
+    if(story_hard_session0330()){const unsigned color=uint32_t(ctx->r5);ctx->r2=color<18?(workshop::story_hard_bridge0330::available().value_or(0)>>color)&1:0;return 1;}
+    const unsigned color=uint32_t(ctx->r5);
+    if(metal_boss_scope0354()){
+        if(!workshop::yoshi_colors0300::extended(color))return 0;
+        ctx->r2=(metal_available_extra0311(rdram)>>(color-8))&1;return 1;
+    }
+    trial_special_project0350(rdram);
+    if(color<18&&(trial_special_blocked0350(rdram)&(1u<<color))){ctx->r2=0;return 1;}
+    if(!workshop::yoshi_colors0300::extended(color))return 0;
+    ctx->r2=(metal_available_extra0311(rdram)>>(color-8))&1;return 1;
 }
 extern "C" void workshop_metal_saved_lives(uint8_t* rdram,recomp_context* ctx){
+    if(workshop::bonus_game0352::active()){ctx->r2=workshop::bonus_game0352::team_available(rdram)>>8;return;}
     if(story_hard_session0330()){workshop::story_hard_bridge0330::saved_extras(rdram,ctx);return;}
+    if(metal_boss_scope0354()){ctx->r2=workshop::boss_metals0354::saved_lives(uint32_t(ctx->r2),workshop::metal_yoshis0300::view())|elemental_owned_extra0355();return;}
     workshop::metal_yoshis0300::set_scope(metal_solo_scope());
     if(story_hybrid_session0320()){
         const auto owned=workshop::metal_yoshis0300::view().found;
         if(!workshop::metal_native0300::continuing(rdram))workshop::story_hybrid0320::new_run(owned);
-        story_lives_ready0320=true;ctx->r2=(uint32_t(ctx->r2)&63)|(workshop::story_hybrid0320::view().metal_alive<<6);return;
+        const auto elemental=workshop::elemental_yoshis0355::story_extra(workshop::metal_native0300::continuing(rdram));
+        if(!workshop::metal_native0300::continuing(rdram))workshop::elemental_yoshis0355::save_story_alive((elemental>>8)&3u);
+        story_lives_ready0320=true;ctx->r2=(uint32_t(ctx->r2)&63)|(workshop::story_hybrid0320::view().metal_alive<<6)|elemental;return;
     }
     if(metal_custom_scope0311())ctx->r2=workshop::metal_custom0311::saved_lives(uint32_t(ctx->r2),workshop::metal_yoshis0300::view());
     else ctx->r2=workshop::metal_native0300::saved_lives(rdram,uint32_t(ctx->r2));
+    const bool story=metal_solo_scope()&&workshop::metal_native0300::story(rdram);
+    const auto elemental=story?workshop::elemental_yoshis0355::story_extra(workshop::metal_native0300::continuing(rdram)):elemental_owned_extra0355();
+    if(story&&!workshop::metal_native0300::continuing(rdram))workshop::elemental_yoshis0355::save_story_alive((elemental>>8)&3u);
+    ctx->r2=uint32_t(ctx->r2)|elemental;
+    if(trial_special_scope0350(rdram))ctx->r2=uint32_t(ctx->r2)&~workshop::trial_special_native0350::metal_extras(trial_special_blocked0350(rdram));
 }
 extern "C" int workshop_metal_death(uint8_t* rdram,recomp_context* ctx){
+    if(workshop::bonus_game0352::active())return workshop::bonus_game0352::team_death(rdram,ctx);
+    if(story_hard_session0330())return workshop::story_hard_bridge0330::death_enter(rdram,ctx);
+    if(elemental_solo_scope0355()&&workshop::yoshi_colors0300::elemental(uint32_t(ctx->r9))){
+        const auto live=workshop::metal_native0300::extras(rdram)&~(1u<<(uint32_t(ctx->r9)-8));
+        workshop::metal_native0300::extras(rdram,live);elemental_save_lives0355(rdram);
+        ctx->r10=live;ctx->r12=MEM_W(0,int32_t(0x800F8DF4));return 1;
+    }
+    if(metal_boss_scope0354()){
+        if(!workshop::boss_metals0354::death(rdram,uint32_t(ctx->r9)))return 0;
+        ctx->r10=workshop::metal_native0300::extras(rdram);ctx->r12=MEM_W(0,int32_t(0x800F8DF4));return 1;
+    }
+    trial_special_death0350(rdram,uint32_t(ctx->r9));
+    trial_special_project0350(rdram);
     if(story_hard_session0330())return workshop::story_hard_bridge0330::death_enter(rdram,ctx);
     if(story_hybrid_session0320()&&workshop::yoshi_colors0300::metal(uint32_t(ctx->r9))){
         const unsigned live=workshop::metal_native0300::extras(rdram)&~(1u<<(uint32_t(ctx->r9)-8));
@@ -818,10 +1012,16 @@ extern "C" int workshop_metal_death(uint8_t* rdram,recomp_context* ctx){
     ctx->r12=MEM_W(0,int32_t(0x800F8DF4));return 1;
 }
 extern "C" void workshop_metal_remaining(uint8_t* rdram,recomp_context* ctx){
-    if(story_hard_session0330()||metal_play_scope0311())ctx->r12|=workshop::metal_native0300::extras(rdram)&0xC0;
+    if(workshop::bonus_game0352::active()){ctx->r12=workshop::bonus_game0352::team_available(rdram);return;}
+    if(trial_special_scope0350(rdram)){
+        trial_special_project0350(rdram);
+        ctx->r12=(uint32_t(ctx->r12)&0x3Fu)|(uint32_t(MEM_W(0,int32_t(0x800F8DF4)))&0xC0u)|(workshop::metal_native0300::extras(rdram)&0x3C0u);return;
+    }
+    if(story_hard_session0330()||metal_play_scope0311())ctx->r12|=workshop::metal_native0300::extras(rdram)&0x3C0;
 }
 extern "C" void workshop_metal_rescued(uint8_t* rdram,recomp_context* ctx){
     if(story_hard_session0330()){workshop::story_hard_bridge0330::rescue_enter(rdram,ctx);return;}
+    if(elemental_solo_scope0355()&&workshop::yoshi_colors0300::elemental(uint32_t(ctx->r2)))workshop::elemental_yoshis0355::restore_life(uint32_t(ctx->r2));
     if(story_hybrid_session0320()){
         if(workshop::yoshi_colors0300::metal(uint32_t(ctx->r2)))workshop::story_hybrid0320::save_lives(((workshop::metal_native0300::extras(rdram)>>6)|(1u<<(uint32_t(ctx->r2)-14)))&3);
         return;
@@ -829,7 +1029,7 @@ extern "C" void workshop_metal_rescued(uint8_t* rdram,recomp_context* ctx){
     if(metal_solo_scope())workshop::metal_native0300::rescued(uint32_t(ctx->r2));
 }
 extern "C" void workshop_progress_boot(uint8_t* rdram,recomp_context* ctx){
-    progress_payload=0;progress_reading=false;if(ctx->r2!=0||story_hybrid_session0320()||story_hard_session0330())return;
+    progress_payload=0;progress_reading=false;if(workshop::bonus_game0352::active()||ctx->r2!=0||story_hybrid_session0320()||story_hard_session0330())return;
     // Preserve the last valid EEPROM before a first reconciliation writes it.
     const auto original=workshop::progress::read(rdram,gpr(int32_t(0x807F2000)));
     if(!workshop::progress::valid(original,story_clears(rdram)))return;
@@ -862,7 +1062,7 @@ static workshop::fruit_mix::Random& hybrid_random(){
     return random;
 }
 static bool heart_collection_allowed(uint8_t* rdram){
-    bool allowed=payload.empty() && !workshop::custom_session::active() && !test_tally
+    bool allowed=!workshop::bonus_game0352::active() && payload.empty() && !workshop::custom_session::active() && !test_tally
         && uint32_t(MEM_W(0,int32_t(0x800F8B88)))==1;
     const auto selected=workshop_menu_session_mode();
     if(workshop_menu_enabled())allowed=allowed && (selected==1 || selected==3);
@@ -907,18 +1107,18 @@ extern "C" void workshop_mix_level(uint8_t* rdram,recomp_context* ctx){
     if(workshop::boss_solo0240::enabled || workshop::boss_campaign0250::enabled)hybrid_level_active=false;
 #endif
     workshop::hybrid_mode::enter(rdram,uint32_t(ctx->r19),hybrid_room);
-    workshop::collections::enter(rdram,hybrid_room&255,uint32_t(ctx->r19),payload.empty());
+    workshop::collections::enter(rdram,hybrid_room&255,uint32_t(ctx->r19),payload.empty()&&!workshop::bonus_game0352::active());
     {
         const bool allowed=heart_collection_allowed(rdram);
         const unsigned level=unsigned(MEM_BU(0,int32_t(0x800F8DFC)))*4+unsigned(MEM_BU(0,int32_t(0x800F8DFD)));
         workshop::heart_pickup0283::enter(rdram,level,hybrid_room&255,uint32_t(ctx->r19),allowed);
     }
     if(story_hard_session0330())workshop::story_hard_bridge0330::enter(rdram,hybrid_room&255);
-    if(!story_hard_session0330()&&workshop::fruit_mix::playable(rdram,uint32_t(ctx->r19)))workshop::finds::enter(
+    if(!workshop::bonus_game0352::active()&&!story_hard_session0330()&&workshop::fruit_mix::playable(rdram,uint32_t(ctx->r19)))workshop::finds::enter(
         unsigned(MEM_BU(0,int32_t(0x800F8DFC)))*4+unsigned(MEM_BU(0,int32_t(0x800F8DFD))),hybrid_room&255,
-        payload.empty() && uint32_t(MEM_W(0,int32_t(0x800F8B88)))<2);
+        payload.empty() && uint32_t(MEM_W(0,int32_t(0x800F8B88)))<2,trial_special_recovery_metals0350(rdram));
     find_binding.reset();find_sources.clear();
-    if(!story_hard_session0330()&&hybrid_level_active && uint32_t(MEM_W(0,int32_t(0x800F8B88)))<2){
+    if(!workshop::bonus_game0352::active()&&!story_hard_session0330()&&hybrid_level_active && uint32_t(MEM_W(0,int32_t(0x800F8B88)))<2){
         const auto p=workshop::progress::read(rdram,gpr(int32_t(0x807F2000)));
         const auto story=story_clears(rdram);
         if(workshop::progress::valid(p,story)){
@@ -986,34 +1186,42 @@ extern "C" uint32_t workshop_mix_spawn(uint8_t* rdram,recomp_context* ctx){
 extern "C" int workshop_use_special_hud(){return special_hud;}
 extern "C" void workshop_807F1300(uint8_t*,recomp_context*);
 extern "C" unsigned workshop_coop_filter_available(unsigned mask){
+    if(workshop::bonus_game0352::active())return workshop::bonus_game0352::team_available(diagnostic_rdram);
     if(story_hard_session0330())return workshop::story_hard_bridge0330::available().value_or(0);
 #ifdef WORKSHOP_NATIVE_COOP
     if(test_coop_native)return workshop::coop_bridge::available_mask(mask&0x3FFFu);
+    if(metal_boss_scope0354())return mask&(0x3FFFu|(metal_available_extra0311(diagnostic_rdram)<<8));
     if(workshop::boss_solo0240::enabled||workshop::boss_campaign0250::enabled)return mask&0x3FFFu;
 #endif
-    return mask;
+    trial_special_project0350(diagnostic_rdram);
+    return mask&~trial_special_blocked0350(diagnostic_rdram);
 }
 extern "C" void workshop_pause_score_lives(uint8_t* rdram,recomp_context* ctx){
     const auto saved=*ctx;
     workshop_807F1300(rdram,ctx);
-    const auto alive=uint32_t(ctx->r2)&((story_hard_session0330()||metal_play_scope0311())?0xFFFFu:0x3FFFu);
+    const auto alive=uint32_t(ctx->r2)&((story_hard_session0330()||metal_play_scope0311())?0x3FFFFu:0x3FFFu);
     *ctx=saved;ctx->r2=std::popcount(alive);
     static unsigned previous=~0u;
     if(fruit_audit && previous!=ctx->r2){previous=unsigned(ctx->r2);fprintf(stderr,"[ScoreAudit] pause vi=%u livingYoshis=%u mask=%04X\n",test_vi.load(),previous,alive);}
 }
 extern "C" void workshop_end_score_lives(uint8_t* rdram,recomp_context* ctx){
+    if(workshop::bonus_game0352::active()){ctx->r5=0;return;}
     if(story_hard_session0330()){if(!workshop::story_hard_bridge0330::end_tally(rdram,ctx))ctx->r5=std::popcount(workshop::story_hard_bridge0330::available().value_or(0));return;}
     const auto saved=*ctx;
     workshop_807F1300(rdram,ctx);
-    const auto alive=uint32_t(ctx->r2)&((story_hard_session0330()||metal_play_scope0311())?0xFFFFu:0x3FFFu);
+    const auto alive=uint32_t(ctx->r2)&((story_hard_session0330()||metal_play_scope0311())?0x3FFFFu:0x3FFFu);
     *ctx=saved;
     const auto p=workshop::progress::read(rdram,gpr(int32_t(0x807F2000)));
     const auto finds=workshop::finds::view();
     ctx->r5=workshop::progress::tally_lives(p,story_clears(rdram),MEM_W(0,int32_t(0x800F8B88))!=0,
         finds.initialized && finds.readable && finds.migrated?6:MEM_BU(0,int32_t(0x800F8DFC)),MEM_BU(0,int32_t(0x800F8DFD)),
-        alive|(workshop::finds::pending()<<8),uint32_t(MEM_W(0,int32_t(0x800F8DF4))),metal_play_scope0311()?0xFFFFu:0x3FFFu);
-    if(story_hybrid_session0320())ctx->r5=std::popcount((alive|(workshop::finds::pending()<<8)|((uint32_t(MEM_W(0,int32_t(0x800F8DF4)))>>4)&192))&0xFFFFu);
-    if(workshop::finds::finish(rdram)&&story_hybrid_session0320()){
+        alive|(workshop::finds::pending()<<8),uint32_t(MEM_W(0,int32_t(0x800F8DF4))),metal_play_scope0311()?0x3FFFFu:0x3FFFu);
+    if(story_hybrid_session0320())ctx->r5=std::popcount((alive|(workshop::finds::pending()<<8)|((uint32_t(MEM_W(0,int32_t(0x800F8DF4)))>>4)&192))&0x3FFFFu);
+    const unsigned pending_metals0350=workshop::finds::pending_metals()<<14;
+    const unsigned pending_bw0350=workshop::trial_special_native0350::carried_bw(uint32_t(MEM_W(0,int32_t(0x800F8DF4))));
+    const bool find_finished0350=workshop::finds::finish(rdram);
+    trial_special_recover0350(rdram,pending_bw0350|(find_finished0350?pending_metals0350:0u));
+    if(find_finished0350&&story_hybrid_session0320()){
         workshop::story_hybrid0320::note_acquired(workshop::finds::view().found);
         workshop::story_hybrid0320::prepare(5,workshop::finds::view().found,workshop::metal_yoshis0300::view().found);
         workshop::story_hybrid0320::save_lives((workshop::metal_native0300::extras(rdram)>>6)&3);
@@ -1122,6 +1330,13 @@ static void custom_victory_fixture(uint8_t* rdram,recomp_context* ctx){
 static void test_find_frame(uint8_t*,recomp_context*);
 static void test_editor_eggs_frame(uint8_t*,recomp_context*);
 extern "C" void workshop_trace_entry(uint8_t* rdram,recomp_context* ctx,const char* name){
+    if(std::string_view(name)=="func_80045CAC")elemental_contacts0355.created(uint32_t(ctx->r4));
+    if(std::string_view(name)=="func_800439F4"||std::string_view(name)=="func_80045B64")elemental_contacts0355.forget(uint32_t(ctx->r4));
+    if(std::string_view(name)=="func_8006DA0C")elemental_contacts0355.clear_pending();
+    if(workshop::bonus_game0352::active()&&workshop::bonus_game0352::observes_trace(name)){
+        workshop::bonus_game0352::frame_context(test_vi.load(),section_addresses,286);
+        workshop::bonus_game0352::trace(rdram,ctx,name);
+    }
 #ifdef WORKSHOP_NATIVE_COOP
     starting_bonus.trace(rdram,ctx,name,starting_bonus_environment(rdram));
 #endif
@@ -1130,6 +1345,7 @@ extern "C" void workshop_trace_entry(uint8_t* rdram,recomp_context* ctx,const ch
         uint32_t(section_addresses[134]),uint32_t(section_addresses[220]),
         uint32_t(section_addresses[227]),uint32_t(MEM_W(0,int32_t(0x800F8828)))});
     for(const auto& receipt:workshop::heart_pickup0283::drain()){
+        if(workshop::bonus_game0352::active())continue;
         const auto result=workshop::heart_shop0283::wallet().claim(receipt.level,receipt.slot);
         fprintf(stderr,"[HeartWallet] collect level=%u slot=%u room=%u actor=%08X birth=%llu status=%u balance=%u nativeReceipt=1\n",
             receipt.level,receipt.slot,receipt.room,receipt.actor,(unsigned long long)receipt.birth,unsigned(result.status),result.balance);
@@ -1369,8 +1585,8 @@ extern "C" void workshop_trace_entry(uint8_t* rdram,recomp_context* ctx,const ch
         if(story_hard_session0330())workshop::story_hard_bridge0330::frame(rdram,ctx);
         story_observer0320.frame(rdram,ctx);
         if(story_pending_worlds0320&&uint32_t(ctx->r4)==0x800F7EA0&&test_vi.load()%300==0)story_world_receipt0320({});
-        workshop::achievements::frame(rdram,ctx,payload.empty() && !test_tally);
-        bool hybrid_completion_allowed=payload.empty() && !workshop::custom_session::active() && !test_tally;
+        workshop::achievements::frame(rdram,ctx,payload.empty() && !test_tally && !workshop::bonus_game0352::active());
+        bool hybrid_completion_allowed=!workshop::bonus_game0352::active() && payload.empty() && !workshop::custom_session::active() && !test_tally;
 #ifdef WORKSHOP_NATIVE_COOP
         hybrid_completion_allowed=hybrid_completion_allowed && !test_coop_native && !workshop::boss_solo0240::enabled && !workshop::boss_campaign0250::enabled;
 #endif
@@ -1399,7 +1615,7 @@ extern "C" void workshop_trace_entry(uint8_t* rdram,recomp_context* ctx,const ch
     std::lock_guard lock(lookup_mutex);
     lookup_records[lookup_count++%lookup_records.size()]={0,uint32_t(ctx->r31),sp,uint32_t(ctx->r4),uint32_t(ctx->r5),name};
 }
-extern "C" int workshop_egg_allowed(uint8_t* rdram,unsigned color){return !story_hard_session0330()&&workshop::collections::egg_allowed(rdram,color);}
+extern "C" int workshop_egg_allowed(uint8_t* rdram,unsigned color){return !workshop::bonus_game0352::active()&&!story_hard_session0330()&&workshop::collections::egg_allowed(rdram,color);}
 extern "C" void func_80058A14(uint8_t*,recomp_context*);
 extern "C" void func_80047090(uint8_t*,recomp_context*);
 extern "C" void func_8004613C(uint8_t*,recomp_context*);
@@ -1407,6 +1623,7 @@ extern "C" void func_8003B328(uint8_t*,recomp_context*);
 extern "C" void func_8003B890(uint8_t*,recomp_context*);
 extern "C" void func_8003B8B0(uint8_t*,recomp_context*);
 static std::optional<unsigned> workshop_find_place(uint8_t* rdram,recomp_context* ctx,uint32_t actor,bool container){
+    if(workshop::bonus_game0352::active())return {};
     if(story_hard_session0330())return {};
     if(!workshop::fruit_mix::range(actor,container?0x90:0x48))return {};
     const auto a=gpr(int32_t(actor));const auto id=MEM_HU(12,a);
@@ -1575,6 +1792,7 @@ static void test_find_frame(uint8_t* rdram,recomp_context* ctx){
 }
 extern "C" void workshop_find_egg_state(uint8_t*,recomp_context*);
 extern "C" void workshop_find_egg_state(uint8_t* rdram,recomp_context* ctx){
+    if(workshop::bonus_game0352::active())return;
     if(story_hard_session0330()&&workshop::story_hard_bridge0330::egg_state(rdram,ctx))return;
     const auto state=MEM_BU(0x1F,ctx->r29);
     if(workshop::editor_objects::egg_state(uint32_t(ctx->r4),state)){
@@ -1594,15 +1812,34 @@ extern "C" void workshop_find_egg_state(uint8_t* rdram,recomp_context* ctx){
     }
 }
 extern "C" int workshop_egg_bubble_gate(uint8_t* rdram,recomp_context* ctx){
+    if(workshop::bonus_game0352::active()){
+        const auto actor=uint32_t(ctx->r4);
+        if(!workshop::fruit_mix::range(actor,0x10))return 0;
+        const gpr address=gpr(int32_t(actor));
+        const auto kind=MEM_HU(12,address);
+        ctx->r2=kind==0x4692||kind==0x4693||kind==0x46AA||kind==0x46AE;return 1;
+    }
     if(story_hard_session0330()&&workshop::story_hard_bridge0330::egg_bubble_gate(rdram,ctx))return 1;
     if(workshop::editor_objects::source_color(uint32_t(ctx->r4))){ctx->r2=0;return 1;}
     if(workshop_find_source(rdram,ctx))return 1;
-    if(auto hidden=workshop::collections::egg_bubble_hidden(rdram,uint32_t(ctx->r4))){ctx->r2=*hidden;return 1;}
+    const auto bubble=uint32_t(ctx->r4);
+    if(trial_special_scope0350(rdram)&&workshop::fruit_mix::range(bubble,0x10)){
+        const auto kind=MEM_HU(12,int32_t(bubble));
+        if(kind==0x4692||kind==0x4693){
+            const unsigned color=kind==0x4692?6:7;
+            const auto state=trial_special_store0350.snapshot();
+            if(state.readable&&state.last_write_succeeded&&(state.lost_mask&(1u<<color))&&trial_special_owned0350(rdram,color)){
+                const unsigned carried_flag=1u<<(color+4);
+                ctx->r2=!workshop::collections::egg_allowed(rdram,color)||(uint32_t(MEM_W(0,int32_t(0x800F8DF4)))&carried_flag)!=0;return 1;
+            }
+        }
+    }
+    if(auto hidden=workshop::collections::egg_bubble_hidden(rdram,bubble)){ctx->r2=*hidden;return 1;}
     return 0;
 }
 extern "C" void workshop_egg_enemy_color(uint8_t* rdram,recomp_context* ctx){
     const auto color=uint32_t(MEM_W(0,int32_t(0x807F0008)));
-    if(workshop::yoshi_colors0300::metal(color))return;
+    if(workshop::yoshi_colors0300::extended(color))return;
     if(color==6 || color==7 || !workshop::rewards::custom_enemy_variant)return;
     if(auto variant=workshop::rewards::custom_enemy_variant(uint32_t(ctx->r5));variant && *variant<6)
         MEM_W(0x10,ctx->r29)=8+*variant;
@@ -1610,6 +1847,7 @@ extern "C" void workshop_egg_enemy_color(uint8_t* rdram,recomp_context* ctx){
 extern "C" void workshop_egg_default_color(uint8_t* rdram,recomp_context* ctx){
     if(!ctx->r2)return;
     const auto color=uint32_t(MEM_W(0,int32_t(0x807F0008)));
+    if(workshop::yoshi_colors0300::elemental(color)){ctx->r7=workshop::yoshi_colors0300::native_alias(color);return;}
     if(workshop::yoshi_colors0300::metal(color)){ctx->r7=color;return;}
     if(color!=6 && color!=7 && workshop::rewards::custom_enemy_variant){
         const auto source=uint32_t(MEM_W(0x24,ctx->r29));
@@ -1625,6 +1863,7 @@ extern "C" int workshop_special_food(uint8_t* rdram,recomp_context* ctx){
     const auto id=MEM_HU(12,actor);
     const auto index=workshop::special::fruit_index(id);
     const auto color=uint32_t(MEM_W(0,int32_t(0x807F0008)));
+    if(workshop::yoshi_colors0300::elemental(color)&&id==0x45B6){ctx->r8=color==17?0:3;ctx->r12=MEM_W(0x2C,ctx->r29);return 1;}
     if(index<0){
         if(!workshop::rewards::enemy_food(id))return 0;
         const auto life=workshop::rewards::food_gain(rdram,uint32_t(actor),color,false);
@@ -1641,7 +1880,11 @@ extern "C" void workshop_food_health(uint8_t* rdram,recomp_context* ctx){
 #ifdef WORKSHOP_NATIVE_COOP
     if(workshop::boss_campaign0250::active())if(auto life=workshop::boss_variants0250::healing_override(rdram,actor)){ctx->r2=gpr(*life);return;}
 #endif
-    if(auto value=workshop::rewards::food_gain(rdram,actor,color,false,unsigned(ctx->r8)))ctx->r2=gpr(*value);
+    if(auto value=workshop::rewards::food_gain(rdram,actor,color,false,unsigned(ctx->r8))){
+        int delta=*value;
+        if(color==17&&delta<0){const auto hp=unsigned(MEM_W(0,int32_t(0x800F8DB4+6*4)));delta=-int(std::min(3u,hp<=8?hp:0u));}
+        ctx->r2=gpr(delta);
+    }
 }
 extern "C" void workshop_food_score(uint8_t* rdram,recomp_context* ctx){
     const auto color=uint32_t(MEM_W(0,int32_t(0x807F0008)));
@@ -1666,7 +1909,7 @@ extern "C" void workshop_enemy_kill_reward(uint8_t* rdram,recomp_context* ctx){
     if(workshop::boss_campaign0250::active()&&workshop::boss_variants0250::renewable_actor(rdram,uint32_t(ctx->r5))){ctx->r12=0;ctx->r13=1;return;}
 #endif
     if(workshop::rewards::no_enemy_score(rdram,uint32_t(ctx->r5))){ctx->r12=0;ctx->r13=1;return;}
-    if(auto value=workshop::rewards::custom_gain(uint32_t(ctx->r5),color)){ctx->r12=gpr(*value);ctx->r13=workshop::rewards::popup(*value);return;}
+    if(auto value=workshop::rewards::custom_gain(rdram,uint32_t(ctx->r5),color)){ctx->r12=gpr(*value);ctx->r13=workshop::rewards::popup(*value);return;}
     if(!workshop::rewards::hybrid(color) || !workshop::fruit_mix::range(uint32_t(ctx->r5),0x10)
         || !workshop::rewards::enemy_food(MEM_HU(12,ctx->r5)))return;
     const int value=workshop::rewards::enemy_mean(rdram,uint32_t(ctx->r8),color,true,true);
@@ -1766,7 +2009,7 @@ extern "C" int workshop_battle_selector(uint8_t* r,recomp_context* c){
  const bool handled=workshop::boss_selection0260::handle(r,c,{workshop::boss_campaign0250::enabled,workshop::boss_campaign0250::session.snapshot().phase,uint32_t(section_addresses[workshop::boss_selection0260::overlay_section]),true});
  if(handled)fprintf(stderr,"[BossSelection] direct-native-confirmation vi=%u accessUnchanged=%06X\n",test_vi.load(),workshop::boss_native::word(r,0x800F8E5C));return handled;
 }
-extern "C" int workshop_battle_shared_completion(uint8_t* r,recomp_context* c){return workshop::boss_campaign0250::shared_completion(r,c);}
+extern "C" int workshop_battle_shared_completion(uint8_t* r,recomp_context* c){if(workshop::bonus_game0352::active()){workshop::bonus_game0352::frame_context(test_vi.load(),section_addresses,286);return workshop::bonus_game0352::shared_completion(r,c);}return workshop::boss_campaign0250::shared_completion(r,c);}
 extern "C" uintptr_t workshop_flower_creator_begin(uint8_t* r,recomp_context* c){return reinterpret_cast<uintptr_t>(new workshop::coop_classic_flower0250::PetalCreationScope(r,uint32_t(c->r4)));}
 extern "C" void workshop_flower_creator_finish(uintptr_t ticket){delete reinterpret_cast<workshop::coop_classic_flower0250::PetalCreationScope*>(ticket);}
 extern "C" uint64_t workshop_boss_tree_spawn_enter(uint8_t* r,recomp_context* context){
@@ -1805,7 +2048,7 @@ static void record_native_battle(uint8_t* rdram){
  }
  const bool saved=a::record(e);boss_award_saved=saved;fprintf(stderr,"[BossChallenge] saved=%u diagnostic=%u provenance=%u completed=%u reason=%s\n",unsigned(saved),unsigned(e.diagnostic),unsigned(e.provenance),e.completed,a::snapshot().reason.c_str());
 }
-extern "C" unsigned workshop_battle_challenges(){return workshop::boss_challenges0260::snapshot().mask14;}
+extern "C" unsigned workshop_battle_challenges(){return workshop::boss_challenges0260::snapshot().mask18;}
 extern "C" int workshop_battle_awarded(){return boss_award_saved.load();}
 extern "C" int workshop_battle_challenge_readable(){return workshop::boss_challenges0260::snapshot().readable;}
 extern "C" int workshop_battle_diagnostic(){return workshop::boss_campaign0250::session.snapshot().diagnostic;}
@@ -1824,17 +2067,20 @@ extern "C" int workshop_battle_prepare(){
 // Only the native4550 getter's first pool allocation is expanded. The native
 // header/provider and every12-segment per-head proof remain unchanged.
 extern "C" int workshop_boss_candy_pool_enter(uint8_t* r,recomp_context* c){
+ if(workshop::bonus_game0352::active()){workshop::bonus_game0352::frame_context(test_vi.load(),section_addresses,286);return workshop::bonus_game0352::candy_pool_enter(r,c);}
  namespace campaign=workshop::boss_campaign0250;namespace pool=workshop::boss_candy_pool0260;
  const auto choice=campaign::candy_pool.enter(r,c,campaign::candy_pool_frame(uint32_t(section_addresses[168])));
  if(choice==pool::Choice::Refused)campaign::fail("candy_segment_pool_live_or_unknown");return int(choice);
 }
 extern "C" void workshop_boss_candy_pool_leave(uint8_t* r,const recomp_context* c,int ticket){
+ if(workshop::bonus_game0352::active()){workshop::bonus_game0352::candy_pool_leave(r,c,ticket);return;}
  namespace campaign=workshop::boss_campaign0250;
  if(ticket!=1)return;if(!campaign::candy_pool.leave(r,c)){campaign::fail("candy_segment_pool_native_initialization_rejected");return;}
  const auto& lease=campaign::candy_pool.snapshot().lease;
  std::fprintf(stderr,"[BossCandyPool] action=initialized header=%08X registry=%08X storage=%08X slots=%u candies=%u index=%u native4667C=1 nativeProviderUnchanged=1\n",lease.header,lease.registry,workshop::boss_candy_pool0260::storage,lease.slots,lease.slots/12,campaign::session.snapshot().index);
 }
 extern "C" void workshop_boss_candy_pool_cleanup(uint8_t* r,const recomp_context* entry,const recomp_context* result){
+ if(workshop::bonus_game0352::active()){workshop::bonus_game0352::candy_pool_cleanup(r,entry,result);return;}
  namespace campaign=workshop::boss_campaign0250;
  if(campaign::candy_pool.cleanup_return(r,entry,result))std::fprintf(stderr,"[BossCandyPool] action=native-cleanup header=%08X registry=%08X native46324Returned=1 unregistrationStillRequired=1\n",campaign::candy_pool.snapshot().lease.header,campaign::candy_pool.snapshot().lease.registry);
 }
@@ -1842,13 +2088,14 @@ extern "C" void workshop_boss_candy_pool_cleanup(uint8_t* r,const recomp_context
 extern "C" int workshop_battle_done(){return workshop::boss_campaign0250::finished.load();}
 extern "C" int workshop_battle_failed(){return workshop::boss_campaign0250::failed.load();}
 extern "C" int workshop_battle_hook_enter(uint8_t* r,recomp_context* c,const char* n){
+ if(workshop::bonus_game0352::active()){workshop::bonus_game0352::frame_context(test_vi.load(),section_addresses,286);workshop::bonus_game0352::wrapped_entry(r,c,n);return 0;}
  if(workshop::boss_campaign0250::enabled&&std::string_view(n)=="func_8069D05C"){workshop::boss_campaign0250::current_vi=test_vi.load();workshop::boss_campaign0250::overlays[189]=uint32_t(section_addresses[189]);}
  if(std::string_view(n)=="func_8069D05C")workshop::boss_checkpoint_probe0260::trace_entry(r,c,std::string_view(n),test_vi.load(),recomp::mem_size,checkpoint_probe_enabled());
  return workshop::boss_campaign0250::hook_enter(r,c,n);
 }
-extern "C" void workshop_battle_hook_leave(uint8_t* r,const recomp_context* c,const char* n){workshop::boss_campaign0250::hook_leave(r,c,n);if(std::string_view(n)=="func_8069D05C")workshop::boss_checkpoint_probe0260::trace_leave(r,c,std::string_view(n),test_vi.load(),recomp::mem_size,checkpoint_probe_enabled());}
-extern "C" int workshop_battle_paint_begin(uint8_t* r,recomp_context* c,unsigned fn){return workshop::boss_campaign0250::active() && (fn==0x8005F700 || fn==0x805C6500 || fn==0x8066664C) && workshop::boss_variants0250::palette_begin(r,uint32_t(fn==0x8005F700?c->r4:c->r5),fn==0x8005F700,workshop::boss_campaign0250::variant_frame(r));}
-extern "C" void workshop_battle_paint_finish(uint8_t* r){workshop::boss_variants0250::palette_finish(r);}
+extern "C" void workshop_battle_hook_leave(uint8_t* r,const recomp_context* c,const char* n){if(workshop::bonus_game0352::active()){workshop::bonus_game0352::frame_context(test_vi.load(),section_addresses,286);workshop::bonus_game0352::wrapped_leave(r,c,n);return;}workshop::boss_campaign0250::hook_leave(r,c,n);if(std::string_view(n)=="func_8069D05C")workshop::boss_checkpoint_probe0260::trace_leave(r,c,std::string_view(n),test_vi.load(),recomp::mem_size,checkpoint_probe_enabled());}
+extern "C" int workshop_battle_paint_begin(uint8_t* r,recomp_context* c,unsigned fn){if(workshop::bonus_game0352::active()){workshop::bonus_game0352::frame_context(test_vi.load(),section_addresses,286);return (fn==0x8005F700||fn==0x805C6500)&&workshop::bonus_game0352::paint_begin(r,uint32_t(fn==0x8005F700?c->r4:c->r5),fn==0x8005F700);}return workshop::boss_campaign0250::active() && (fn==0x8005F700 || fn==0x805C6500 || fn==0x8066664C) && workshop::boss_variants0250::palette_begin(r,uint32_t(fn==0x8005F700?c->r4:c->r5),fn==0x8005F700,workshop::boss_campaign0250::variant_frame(r));}
+extern "C" void workshop_battle_paint_finish(uint8_t* r){if(workshop::bonus_game0352::active()){workshop::bonus_game0352::paint_finish(r);return;}workshop::boss_variants0250::palette_finish(r);}
 
 
 // Scoped native checkpoint hooks. These are inert for ordinary Vanilla scenes.
@@ -2272,9 +2519,22 @@ bool workshop_configure(int& argc, char** argv) {
                 workshop::require(workshop::game_modes0320::valid(mode),"Invalid book mode");workshop_menu_start_mode(mode);continue;
             }
 #ifdef WORKSHOP_CONTENT_BUILD
+            if(std::string_view(argv[n])=="--workshop-bonus-bridge0352"){bonus_preview0352=true;continue;}
+            if(std::string_view(argv[n])=="--workshop-bonus-route0353"){
+                workshop::require(n+2<argc,"Expected Bonus page and seed");bonus_page0353=std::stoul(argv[++n]);bonus_seed0353=std::stoull(argv[++n]);
+                workshop::require(bonus_page0353>=1&&bonus_page0353<=6,"Expected Bonus page1..6");bonus_route0353=true;continue;
+            }
+            if(std::string_view(argv[n])=="--workshop-bonus-finales0353"){
+                workshop::require(n+2<argc,"Expected complete Bonus page and seed");bonus_page0353=std::stoul(argv[++n]);bonus_seed0353=std::stoull(argv[++n]);
+                workshop::require(bonus_page0353>=1&&bonus_page0353<=6,"Expected Bonus page1..6");bonus_complete0353=true;continue;
+            }
+            if(std::string_view(argv[n])=="--workshop-bonus-selection0353"){
+                workshop::require(n+3<argc,"Expected Bonus page, seed and restart choice");bonus_page0353=std::stoul(argv[++n]);bonus_seed0353=std::stoull(argv[++n]);const auto choice=std::stoul(argv[++n]);
+                workshop::require(bonus_page0353>=1&&bonus_page0353<=6&&choice<=1,"Invalid Bonus selection");bonus_new0353=choice!=0;bonus_selection0353=true;continue;
+            }
             if(std::string_view(argv[n])=="--workshop-hard-preview"){hard_preview0330=true;continue;}
             if(std::string_view(argv[n])=="--workshop-hard-test-egg"){
-                workshop::require(n+1<argc,"Expected Hard preview egg color");hard_test_egg0330=std::stoi(argv[++n]);workshop::require(hard_test_egg0330>=1&&hard_test_egg0330<16,"Invalid Hard preview egg color");continue;
+                workshop::require(n+1<argc,"Expected Hard preview egg color");hard_test_egg0330=std::stoi(argv[++n]);workshop::require(hard_test_egg0330>=1&&hard_test_egg0330<18,"Invalid Hard preview egg color");continue;
             }
 #ifdef WORKSHOP_NATIVE_COOP
             if(std::string_view(argv[n])=="--workshop-test-coop-native"){test_coop_native=true;continue;}
@@ -2397,7 +2657,7 @@ bool workshop_configure(int& argc, char** argv) {
                 workshop::require(end_test_vi>=600 && end_test_vi<=108000,"Invalid test duration");continue;
             }
             if(std::string_view(argv[n])=="--workshop-auto-color"){
-                workshop::require(n+1<argc,"Expected test Yoshi color");test_color=std::stoi(argv[++n]);workshop::require(test_color>=0 && test_color<16,"Invalid test Yoshi color");continue;
+                workshop::require(n+1<argc,"Expected test Yoshi color");test_color=std::stoi(argv[++n]);workshop::require(test_color>=0 && test_color<18,"Invalid test Yoshi color");continue;
             }
             if(std::string_view(argv[n])=="--workshop-input"){
                 workshop::require(n+1<argc,"Expected one controller test script");
@@ -2574,6 +2834,23 @@ bool workshop_configure(int& argc, char** argv) {
 #endif
 #endif
 #ifdef WORKSHOP_SPECIAL_CONTENT
+        if(bonus_preview0352||bonus_route0353){
+            workshop::require(!(bonus_preview0352&&bonus_route0353),"Conflicting Bonus diagnostic paths");
+            workshop::require(workshop_menu_enabled()&&end_test_vi&&!test_inputs.empty()&&payload.empty()&&!workshop::custom_session::active()&&!hard_preview0330&&!test_tally&&!test_spawn&&!test_warp&&test_stage<0&&test_zone<0,"Bonus bridge requires a bounded independent input test");
+#ifdef WORKSHOP_NATIVE_COOP
+            workshop::require(!test_coop_native&&!workshop::boss_solo0240::enabled&&!workshop::boss_campaign0250::enabled,"Bonus bridge cannot use deferred modes");
+#endif
+        }
+        if(bonus_complete0353||bonus_selection0353){
+            workshop::require(!bonus_preview0352&&!bonus_route0353&&!(bonus_complete0353&&bonus_selection0353)&&workshop_menu_enabled()&&payload.empty()&&!workshop::custom_session::active()&&!hard_preview0330&&!test_tally&&!test_spawn&&!test_warp&&test_stage<0&&test_zone<0,"Complete Bonus requires its independent native menu session");
+#ifdef WORKSHOP_NATIVE_COOP
+            workshop::require(!test_coop_native&&!workshop::boss_solo0240::enabled&&!workshop::boss_campaign0250::enabled,"Complete Bonus cannot enter deferred modes");
+#endif
+        }
+        workshop::bonus_game0352::configure_private_preview(std::filesystem::current_path(),bonus_preview0352);
+        workshop::bonus_game0352::configure_private_route(std::filesystem::current_path(),bonus_route0353,bonus_page0353,bonus_seed0353);
+        workshop::bonus_game0352::configure_private_complete(std::filesystem::current_path(),bonus_complete0353,bonus_page0353,bonus_seed0353);
+        if(bonus_selection0353)workshop::bonus_game0352::configure_bonus_selection(std::filesystem::current_path(),bonus_page0353,bonus_seed0353,bonus_new0353);
         bool hard_verified=false;
         if(hard_preview0330){
             const auto directory=std::filesystem::current_path();const auto marker=directory/"story-hard-qa.txt";
@@ -2607,6 +2884,7 @@ extern "C" void recomp_entrypoint(uint8_t*,recomp_context*);
 void workshop_game_entrypoint0320(uint8_t* rdram,recomp_context* context){
 #ifdef WORKSHOP_CONTENT_BUILD
 #ifdef WORKSHOP_SPECIAL_CONTENT
+    if(workshop::bonus_game0352::active())ultramodern::change_save_file({},workshop::bonus_game0352::save_stem());
     if(story_hybrid_session0320()){
         canonical_rights0320=workshop::story_rights0320::read(recomp::get_config_path()/"saves"/"yoshisstory.n64.us.bin");
         workshop::require(canonical_rights0320.trial_complete(),"Story Hybrid requires all24 genuine Trial clears");
@@ -2638,9 +2916,22 @@ void workshop_on_init(uint8_t* rdram, recomp_context*) {
 #ifndef WORKSHOP_DISABLE_HYBRID_FINDS
     workshop::finds::initialize();
     workshop::metal_yoshis0300::initialize();
+    workshop::elemental_yoshis0355::initialize();
+    workshop::known_yoshis_runtime0355::canonical(workshop::story_rights0320::read(recomp::get_config_path()/"saves"/"yoshisstory.n64.us.bin"));
+    elemental_contacts0355.reset();
+    elemental_tongue_draws0355.clear();
+    {
+        std::lock_guard guard(trial_pending_mutex0350);
+        trial_special_profile0350=std::filesystem::current_path();
+        // Preserve failed loss receipts across a same-process restart. Distinct
+        // profile keys prevent a custom/preview profile from inheriting them.
+        trial_pending_by_profile0350[trial_special_profile0350].last_retry_vi=0;
+    }
+    trial_special_store0350.load(std::filesystem::current_path());
 #endif
     if(!workshop_menu_enabled() && end_test_vi){workshop::collections::initialize();workshop::collections::start_session(test_hybrid?3:1);workshop::hybrid_mode::initialize();workshop::hybrid_mode::activate(test_hybrid);workshop::hybrid_completion0290::initialize("pc-hybrid-completion.json","pc-hybrid-records.json");workshop::hybrid_completion0290::start_session(test_hybrid?3:1);}
     workshop::metal_yoshis0300::set_scope(metal_solo_scope());
+    workshop::elemental_yoshis0355::start_session(workshop_menu_enabled()?unsigned(workshop_menu_session_mode()):end_test_vi?(test_hybrid?3:1):4,elemental_solo_scope0355());
     workshop::metal_native0300::story_ready=false;
     story_lives_ready0320=false;story_observer0320.reset();story_pending_worlds0320=0;
     if(workshop_menu_enabled())workshop::metal_yoshis0300::start_session(unsigned(workshop_menu_session_mode()),metal_solo_scope());
@@ -2667,7 +2958,19 @@ void workshop_on_init(uint8_t* rdram, recomp_context*) {
     for(uint8_t value:rom){hash^=value;hash*=1099511628211ULL;}
     workshop::require(hash==workshop_content_hash,"Content data differs from the recompiled game");
 #ifdef WORKSHOP_SPECIAL_CONTENT
-    rom=workshop::gold_silver_resources0300::apply(std::move(rom));
+    if(workshop::bonus_game0352::active()){
+        const auto original_path=recomp::get_config_path()/"yoshisstory.n64.us.z64";
+        std::ifstream original_file(original_path,std::ios::binary|std::ios::ate);
+        workshop::require(bool(original_file)&&original_file.tellg()==workshop::rom_size,"Bonus original USA ROM unavailable");
+        std::vector<uint8_t> original(workshop::rom_size);original_file.seekg(0);original_file.read(reinterpret_cast<char*>(original.data()),original.size());
+        const auto rights=workshop::story_rights0320::read(recomp::get_config_path()/"saves"/"yoshisstory.n64.us.bin");
+        const auto finds=workshop::finds::view();const auto metals=workshop::metal_yoshis0300::view();
+        const workshop::bonus_team0353::Rights ownership{rights.present&&rights.readable,
+            finds.initialized&&finds.readable&&finds.saved,metals.initialized&&metals.readable&&metals.saved,
+            rights.bw_earned,finds.migrated?finds.found:((rights.present&&rights.readable)?rights.legacy_owned:0u),metals.found,workshop::elemental_yoshis0355::view().initialized&&workshop::elemental_yoshis0355::view().readable&&workshop::elemental_yoshis0355::view().saved,workshop::elemental_yoshis0355::view().found};
+        rom=workshop::unknown_yoshi_resources0355::apply(workshop::elemental_resources0355::apply(workshop::gold_silver_resources0300::apply(std::move(rom))));
+        workshop::require(bool(original_file)&&workshop::bonus_game0352::prepare_native(original,rdram,workshop::bonus_team0353::owned(ownership),&rom),"Bonus native preparation failed");
+    }else rom=workshop::unknown_yoshi_resources0355::apply(workshop::elemental_resources0355::apply(workshop::gold_silver_resources0300::apply(std::move(rom))));
     if(story_hard_session0330())rom=workshop::story_hard_bridge0330::patch_rom(std::move(rom));
     workshop::special_bubbles::configure(rom,payload);
     workshop::editor_objects::configure(rom,payload);workshop::black_flyguy::configure(payload);workshop::passages::configure(rom,payload);
@@ -2730,6 +3033,7 @@ void workshop_on_init(uint8_t* rdram, recomp_context*) {
 #ifdef WORKSHOP_SPECIAL_CONTENT
     recomp::do_rom_read(rdram,gpr(int32_t(0x807FC000)),0x10FB0000,120);
     recomp::do_rom_read(rdram,gpr(int32_t(workshop::gold_silver_resources0300::metadata_ram)),0x10000000u+uint32_t(workshop::gold_silver_resources0300::metadata_rom),uint32_t(workshop::gold_silver_resources0300::metadata_size));
+    recomp::do_rom_read(rdram,gpr(int32_t(workshop::elemental_resources0355::metadata_ram)),0x10000000u+uint32_t(workshop::elemental_resources0355::metadata_rom),uint32_t(workshop::elemental_resources0355::metadata_size));
 #ifdef WORKSHOP_NATIVE_COOP
     if(workshop::boss_campaign0250::enabled){
         namespace aliases=workshop::boss_lips_terrain_alias0260;

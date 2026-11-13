@@ -1,0 +1,173 @@
+name: Private Linux 0.35.5 candidate
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: Reviewed frozen source commit (full SHA)
+        type: string
+        required: true
+      encrypted_input_commit:
+        description: Reviewed public ciphertext-only orphan commit (full SHA)
+        type: string
+        required: true
+      encrypted_sha256:
+        description: Encrypted native-input SHA256
+        type: string
+        required: true
+      plaintext_sha256:
+        description: Expected decrypted native-input archive SHA256
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: linux0355-private-candidate
+  cancel-in-progress: false
+jobs:
+  candidate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 2
+      DOTNET_PROCESSOR_COUNT: 2
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+      SOURCE_COMMIT: ${{ inputs.source_commit }}
+      ENCRYPTED_INPUT_COMMIT: ${{ inputs.encrypted_input_commit }}
+      ENCRYPTED_SHA256: ${{ inputs.encrypted_sha256 }}
+      PLAINTEXT_SHA256: ${{ inputs.plaintext_sha256 }}
+    steps:
+      - name: Checkout reviewed frozen sources and pinned submodules
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_commit }}
+          submodules: recursive
+          persist-credentials: false
+      - name: Enforce reviewed inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ENCRYPTED_INPUT_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ENCRYPTED_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$PLAINTEXT_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
+          test "$SOURCE_COMMIT" = "$GITHUB_SHA"
+          test ! -e pc/dinotale/yoshisstory.us.z64
+      - name: Install controlled Ubuntu build dependencies and SDL2.30.3
+        shell: bash
+        run: bash pc/scripts/ci/setup-linux0355.sh
+      - name: Fetch reviewed ciphertext-only orphan commit (read only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags "https://github.com/$GITHUB_REPOSITORY.git" "$ENCRYPTED_INPUT_COMMIT"
+          test "$(git rev-parse FETCH_HEAD)" = "$ENCRYPTED_INPUT_COMMIT"
+          test "$(git ls-tree --name-only FETCH_HEAD)" = native-inputs.enc
+          test "$(git cat-file -t FETCH_HEAD:native-inputs.enc)" = blob
+          test -z "$(git cat-file -p FETCH_HEAD | sed -n 's/^parent //p')"
+          mkdir -p pc/build/linux-mint-0355
+          git show FETCH_HEAD:native-inputs.enc > pc/build/linux-mint-0355/native-inputs.enc
+          printf '%s  %s\n' "$ENCRYPTED_SHA256" pc/build/linux-mint-0355/native-inputs.enc | sha256sum --check --strict
+      - name: Authenticate and stage private generated sources
+        shell: bash
+        env:
+          DINOTALE_CI_PRIVATE_KEY: ${{ secrets.DINOTALE_CI_PRIVATE_KEY }}
+        run: |
+          python3 pc/scripts/ci/private-inputs0355.py unpack \
+            --input pc/build/linux-mint-0355/native-inputs.enc \
+            --output pc/build/linux-mint-0355/private-inputs \
+            --encrypted-sha256 "$ENCRYPTED_SHA256" \
+            --plaintext-sha256 "$PLAINTEXT_SHA256" \
+            --source-commit "$SOURCE_COMMIT"
+      - name: Fresh C17 C++20 native and worker build with preserved RSP (two CPUs)
+        shell: bash
+        run: |
+          python3 pc/scripts/ci/build-native0355.py \
+            --private-inputs pc/build/linux-mint-0355/private-inputs \
+            --source-commit "$SOURCE_COMMIT"
+      - name: Targeted0355 POSIX persistence proof
+        shell: bash
+        run: python3 pc/scripts/ci/posix0355.py
+      - name: Verify Bonus shell launcher using disposable fake processes only
+        shell: bash
+        run: python3 pc/scripts/verify-linux-bonus-launcher0355.py
+      - name: Install pinned .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.300
+      - name: Publish actual0355 Linux Workshop
+        shell: bash
+        run: python3 pc/scripts/publish-workshop-linux-ci0355.py --publish-go
+      - name: Verify headless Workshop APIs and qualify exact manifest
+        shell: bash
+        run: |
+          python3 pc/scripts/verify-linux-atelier0355.py \
+            --app pc/build/workshop-linux0355/YoshiStory-AtelierLinux \
+            --record-qualified-manifest
+      - name: Stage factory blank seed and public BPS inputs
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,shutil
+          seed=Path('pc/release/fresh-save0355.bin')
+          assert seed.stat().st_size==2048 and hashlib.sha256(seed.read_bytes()).hexdigest()=='ccca4870f3b5f2d11519568c1f003387a62f5d13adbed9ed99c8089b74c68585'
+          dest=Path('pc/profiles/portable-fresh-seed-20261028/saves/yoshisstory.n64.us.bin');dest.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(seed,dest)
+          target=Path('pc/build/publication-0150/distribution');target.mkdir(parents=True,exist_ok=False)
+          for name in ('content.bps','content-patch.json'):shutil.copyfile(Path('pc/distribution')/name,target/name)
+          assert not Path('pc/build/native-linux-0355/workshop-content.bin').exists()
+          PY
+      - name: Check package policy and stage private candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 pc/scripts/check-linux-package0355.py --self-test --report pc/build/linux-mint-0355/package-policy-selftest-ci.json
+          python3 pc/scripts/package-linux0355.py --output dist/Linux-0.35.5-Candidate-01
+          python3 pc/scripts/check-linux-package0355.py \
+            dist/Linux-0.35.5-Candidate-01/DinoTale-Tornie-0.35.5-Linux-x64-Candidate.tar.gz \
+            --extract pc/build/linux-mint-0355/archive-check-extracted \
+            --report pc/build/linux-mint-0355/archive-check-ci.json --worker-identity
+      - name: Upload candidate and sanitized proofs only
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux0355-candidate-${{ inputs.source_commit }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            dist/Linux-0.35.5-Candidate-01/*.tar.gz
+            dist/Linux-0.35.5-Candidate-01/package-report.json
+            pc/build/linux-mint-0355/native-build-final.json
+            pc/build/linux-mint-0355/private-input-manifest.json
+            pc/build/linux-mint-0355/posix-ci/verification.json
+            pc/build/linux-mint-0355/archive-check-ci.json
+            pc/build/linux-mint-0355/package-policy-selftest-ci.json
+            pc/build/linux-mint-0355/bonus-launcher-*/verification.json
+            pc/build/workshop-linux0355/publish-manifest0355.json
+            pc/build/linux-mint-0355/atelier-api-*/verification.json
+            pc/build/linux-mint-0355/workshop-*/verification.json
+      - name: Encrypt private compiler diagnostics
+        if: always()
+        shell: bash
+        env:
+          DINOTALE_CI_PRIVATE_KEY: ${{ secrets.DINOTALE_CI_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import tarfile
+          root=Path('pc/build/linux-mint-0355');root.mkdir(parents=True,exist_ok=True)
+          with tarfile.open(root/'diagnostics.tar.gz','w:gz') as archive:
+            for p in sorted(root.rglob('*.private.log')):archive.add(p,arcname=p.relative_to(root).as_posix(),recursive=False)
+          PY
+          python3 pc/scripts/ci/private-inputs0355.py seal \
+            --input pc/build/linux-mint-0355/diagnostics.tar.gz \
+            --output pc/build/linux-mint-0355/diagnostics.enc
+      - name: Upload encrypted diagnostics only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux0355-encrypted-diagnostics-${{ github.run_id }}
+          retention-days: 3
+          if-no-files-found: warn
+          path: pc/build/linux-mint-0355/diagnostics.enc

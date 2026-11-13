@@ -1,7 +1,7 @@
 #pragma once
 namespace workshop::game_modes0320 {
-enum Mode : int { Story=0, Trial=1, Practice=2, HybridTrial=3, BossBattle=4, StoryHybrid=5, StoryHard=6 };
-constexpr bool valid(int mode){return mode>=Story&&mode<=StoryHard;}
+enum Mode : int { Story=0, Trial=1, Practice=2, HybridTrial=3, BossBattle=4, StoryHybrid=5, StoryHard=6, Bonus=7 };
+constexpr bool valid(int mode){return mode>=Story&&mode<=Bonus;}
 constexpr bool story(int mode){return mode==Story||mode==StoryHybrid||mode==StoryHard;}
 constexpr bool hybrid_content(int mode){return mode==HybridTrial||mode==StoryHybrid;}
 constexpr bool hybrid_trial_records(int mode){return mode==HybridTrial;}

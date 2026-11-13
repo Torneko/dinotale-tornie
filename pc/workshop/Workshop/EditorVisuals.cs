@@ -42,7 +42,15 @@ public static class EditorVisuals {
         using var outline=new Pen(Color.FromArgb(70,64,49),Math.Max(1,w/24));
 
         if(SpecialEditorObjects.IsEgg(p.ObjectId)){
-            int eggColor=SpecialEditorObjects.Color(p.ObjectId);using var spot=new SolidBrush(eggColor==6?Color.LightGray:eggColor==7?Color.FromArgb(40,35,50):Colors[eggColor-8]);
+            int eggColor=SpecialEditorObjects.Color(p.ObjectId);
+            Color spotColor=eggColor switch {
+                6 or 17=>Color.LightGray,
+                7 or 16=>Color.FromArgb(40,35,50),
+                14=>Color.FromArgb(223,185,75),
+                15=>Color.FromArgb(189,200,214),
+                _=>Colors[eggColor-8]
+            };
+            using var spot=new SolidBrush(spotColor);
             g.FillEllipse(Brushes.WhiteSmoke,x+w*.18f,y+h*.1f,w*.64f,h*.82f);g.DrawEllipse(outline,x+w*.18f,y+h*.1f,w*.64f,h*.82f);
             g.FillEllipse(spot,x+w*.3f,y+h*.2f,w*.2f,h*.23f);g.FillEllipse(spot,x+w*.53f,y+h*.45f,w*.2f,h*.24f);g.FillEllipse(spot,x+w*.27f,y+h*.62f,w*.18f,h*.19f);
             using var bubble=new Pen(Color.DeepSkyBlue,Math.Max(1,w/25));g.DrawEllipse(bubble,box);return;

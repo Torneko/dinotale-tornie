@@ -5,16 +5,46 @@
 
 namespace workshop::boss_retry_placements0281 {
 namespace n=boss_native;namespace core=boss_battle0250;namespace rooms=boss_rooms_data0250;
-// 41C6, campaign4511 and opt-in41EC retire through447C8, without48CC0 restoring
-// their consumed placements. A Fish companion4072/4599 intentionally loses
-// its respawn link after a proven defeat (boss_placement0260). Cached6DA0C
-// skips6D85C, so replay rearms only these captured original boss words.
-// Ordinary Genie/Invisible/Lips/Candy arenas remain outside this guard.
-// No actor, HP, score, pose, resource or constructor is created here.
+// Defeated bosses can leave their original native placements consumed:
+// ordinary4072/4599/40A3 detach their respawn link after proven defeat too.
+// Cached6DA0C skips6D85C. A genuine checkpoint rewind therefore rearms the
+// captured declared boss words of every replayed family, never a whole room.
+// No actor, HP, score, pose, resource, item or constructor is created here.
 inline constexpr uint16_t kind=0x41C6;
 inline bool capture_kind(const core::Encounter& e,uint16_t k){
- if(e.family==core::Family::Blargg)return k==0x41EC;
- return e.family==core::Family::Monsters?k==kind:e.family==core::Family::Fish&&(k==0x4511||k==0x4072||k==0x4599);
+ switch(e.family){
+ case core::Family::Candy:return k==0x455A||(e.genie_companion&&k==0x4072);
+ case core::Family::RedCandy:return k==0x455A;
+ case core::Family::Invisible:return k==0x4599;
+ case core::Family::Genie:return k==0x4072;
+ case core::Family::Lips:return k==0x40A3||k==0x455A||k==0x4599;
+ case core::Family::Fish:return k==0x4511||k==0x4072||k==0x4599;
+ case core::Family::Monsters:return k==kind;
+ case core::Family::Blargg:return k==0x41EC;
+ }return false;
+}
+inline bool ordinary_shape(const core::Encounter& e){
+ if(e.variant>2||e.terrain>2||!e.count||e.count>4)return false;
+ auto member=[&](unsigned m,uint16_t k,unsigned hits,bool red=false){const auto& b=e.members[m];return b.kind==k&&b.hits==hits&&std::isfinite(b.scale)&&b.scale>0&&b.scale<=1&&b.red==red&&!b.purple&&!b.green;};
+ switch(e.family){
+ case core::Family::Candy:{
+  const unsigned candies=e.variant?e.variant+1:1;
+  if((e.variant&&e.genie_companion)||e.count!=candies+unsigned(e.genie_companion))return false;
+  for(unsigned m=0;m<candies;++m)if(!member(m,0x455A,12))return false;
+  return !e.genie_companion||(member(1,0x4072,2)&&e.members[1].scale==1.f);
+ }
+ case core::Family::RedCandy:return !e.variant&&!e.genie_companion&&e.count==1&&member(0,0x455A,12,true)&&e.members[0].scale==1.f;
+ case core::Family::Invisible:case core::Family::Genie:{
+  if(e.genie_companion||e.count!=(1u<<e.variant))return false;
+  const auto k=uint16_t(e.family==core::Family::Invisible?0x4599:0x4072);
+  for(unsigned m=0;m<e.count;++m)if(!member(m,k,3-e.variant)||e.members[m].scale!=1.f)return false;
+  return true;
+ }
+ case core::Family::Lips:
+  if(e.genie_companion||e.count!=(e.variant?2u:1u)||!member(0,0x40A3,3)||e.members[0].scale!=1.f)return false;
+  return !e.variant||(e.variant==1?member(1,0x455A,12)&&e.members[1].scale<1.f:member(1,0x4599,3)&&e.members[1].scale==1.f);
+ default:return false;
+ }
 }
 struct Cache {
  uint32_t registry_table=0,entry=0,wrapper=0,header=0,table=0;unsigned count=0;
@@ -46,14 +76,15 @@ inline bool lookup(uint8_t* r,unsigned source,Cache& out){
  if(found!=1)return false;out=value;return true;
 }
 inline bool owned(const rooms::Arena& a,const core::Encounter& e,unsigned index){
- if(index<1||index>8||a.source!=167+index||a.native_init!=0x01000000||e.number!=index+1||!e.count||e.count>4||a.boss_indices.size()!=e.count||a.objects.empty()||a.objects.size()%12||a.objects.size()/12>149)return false;
+ if(index>=10||a.source!=rooms::source_for_encounter(index)||a.native_init!=0x01000000||e.number!=index+1||!e.count||e.count>4||a.boss_indices.size()!=e.count||a.objects.empty()||a.objects.size()%12||a.objects.size()/12>149)return false;
+ if((index==0&&(e.family!=core::Family::Candy||e.variant||e.count!=1||e.genie_companion))||(index==9&&e.family!=core::Family::RedCandy)||(index>0&&index<9&&e.family==core::Family::RedCandy))return false;
  if(e.family==core::Family::Monsters){if(a.logical_source!=151||e.count!=2)return false;}
  else if(e.family==core::Family::Fish){if(a.logical_source!=97||!core::valid_fish(e))return false;}
  else if(e.family==core::Family::Blargg){
   if(a.logical_source!=19||e.variant!=0||e.terrain>2||e.count!=2||e.genie_companion||e.purple_mask||!e.no_flowers||!e.no_egg_blocks)return false;
   for(unsigned m=0;m<e.count;++m){const auto& b=e.members[m];if(b.kind!=0x41EC||b.hits!=3||b.scale!=1.f||b.red||b.purple||b.green)return false;}
  }
- else return false;
+ else if(a.logical_source!=core::room(e.family)||!ordinary_shape(e))return false;
  for(unsigned m=0;m<e.count;++m){const auto at=size_t(a.boss_indices[m])*12;const auto k=e.members[m].kind;
   if(!capture_kind(e,k)||at+12>a.objects.size()||u32(a.objects,at)!=(uint32_t(k)<<16|m))return false;
   for(unsigned other=0;other<m;++other)if(a.boss_indices[other]==a.boss_indices[m])return false;
@@ -105,7 +136,10 @@ public:
  // captured before that transition. No guest write occurs at death/cleanup.
  bool arm(unsigned epoch,unsigned checkpoint,unsigned prior_index){
   if(epoch_==UINT32_MAX||epoch!=epoch_+1||prior_index>=10||checkpoint>prior_index||!boss_checkpoint0260::valid(checkpoint))return reject("retry_epoch");
-  epoch_=epoch;for(unsigned i=0;i<10;++i)rooms_[i].pending_epoch=rooms_[i].captured&&i>=checkpoint&&i<=prior_index?epoch:0;return true;
+  // A second death may occur earlier during replay. Later cached arenas
+  // already owed by that rewind still need restoration when reached again.
+  // Advancing the awakened checkpoint alone banks those earlier rows.
+  epoch_=epoch;for(unsigned i=0;i<10;++i)rooms_[i].pending_epoch=rooms_[i].captured&&i>=checkpoint&&(i<=prior_index||rooms_[i].pending_epoch)?epoch:0;return true;
  }
  template<class Dispatch> bool restore(uint8_t* r,const recomp_context* c,const rooms::Arena& a,const core::Encounter& e,const Fence& f,Receipt& receipt,Dispatch&& dispatch){
   receipt={};if(!pending(f.index))return true;auto& saved=rooms_[f.index];

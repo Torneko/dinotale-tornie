@@ -1,0 +1,680 @@
+--- a/funcs_105.c
++++ b/funcs_105.c
+@@ -1,5 +1,15 @@
+ #include "recomp.h"
+ #include "funcs.h"
++#ifdef WORKSHOP_SPECIAL_CONTENT
++#ifdef __cplusplus
++extern "C" {
++#endif
++int workshop_locked_selection_node0355(uint8_t*,uint32_t);
++int workshop_locked_selection_static0355(uint8_t*,recomp_context*);
++#ifdef __cplusplus
++}
++#endif
++#endif
+ 
+ RECOMP_FUNC void func_8049F874(uint8_t* rdram, recomp_context* ctx) {
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+@@ -1543,6 +1553,9 @@
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    if(workshop_locked_selection_static0355(rdram,ctx))return;
++#endif
+     // 0x804A0548: addiu       $sp, $sp, -0x20
+     ctx->r29 = ADD32(ctx->r29, -0X20);
+     // 0x804A054C: sw          $ra, 0x1C($sp)
+@@ -1579,11 +1592,11 @@
+     // 0x804A0580: jal         0x80045A34
+     ctx->r31 = ADD32(section_addresses[57], 0x148); /* workshop: preserve MIPS link before delay slot */
+     // 0x804A0584: addiu       $a1, $zero, 0x44
+-    ctx->r5 = ADD32(0, 0X4C);
++    ctx->r5 = ADD32(0, 0X54);
+     func_80045A34(rdram, ctx);
+         goto after_1;
+     // 0x804A0584: addiu       $a1, $zero, 0x44
+-    ctx->r5 = ADD32(0, 0X4C);
++    ctx->r5 = ADD32(0, 0X54);
+     after_1:
+     // 0x804A0588: sw          $v0, 0x1F4($s0)
+     MEM_W(0X1F4, ctx->r16) = ctx->r2;
+@@ -1706,7 +1719,7 @@
+     NAN_CHECK(ctx->f10.fl); NAN_CHECK(ctx->f6.fl); 
+     ctx->f10.fl = ctx->f10.fl + ctx->f6.fl;
+     // 0x804A0628: addiu       $t1, $zero, 0xD
+-    ctx->r9 = ADD32(0, 0XF);
++    ctx->r9 = ADD32(0, 0X11);
+ L_804A062C:
+     // 0x804A062C: lw          $t0, 0x0($a0)
+     ctx->r8 = MEM_W(ctx->r4, 0X0);
+@@ -2192,7 +2205,7 @@
+     NAN_CHECK(ctx->f10.fl); NAN_CHECK(ctx->f6.fl); 
+     ctx->f10.fl = ctx->f10.fl - ctx->f6.fl;
+     // 0x804A096C: addiu       $t1, $zero, 0xD
+-    ctx->r9 = ADD32(0, 0XF);
++    ctx->r9 = ADD32(0, 0X11);
+ L_804A0970:
+     // 0x804A0970: lw          $t0, 0x0($a0)
+     ctx->r8 = MEM_W(ctx->r4, 0X0);
+@@ -2678,7 +2691,7 @@
+     NAN_CHECK(ctx->f8.fl); NAN_CHECK(ctx->f4.fl); 
+     ctx->f8.fl = ctx->f8.fl + ctx->f4.fl;
+     // 0x804A0CB0: addiu       $t1, $zero, 0xD
+-    ctx->r9 = ADD32(0, 0XF);
++    ctx->r9 = ADD32(0, 0X11);
+ L_804A0CB4:
+     // 0x804A0CB4: lw          $t0, 0x0($a0)
+     ctx->r8 = MEM_W(ctx->r4, 0X0);
+@@ -3164,7 +3177,7 @@
+     NAN_CHECK(ctx->f8.fl); NAN_CHECK(ctx->f4.fl); 
+     ctx->f8.fl = ctx->f8.fl - ctx->f4.fl;
+     // 0x804A0FF4: addiu       $t1, $zero, 0xD
+-    ctx->r9 = ADD32(0, 0XF);
++    ctx->r9 = ADD32(0, 0X11);
+ L_804A0FF8:
+     // 0x804A0FF8: lw          $t0, 0x0($a0)
+     ctx->r8 = MEM_W(ctx->r4, 0X0);
+@@ -3849,7 +3862,7 @@
+     // 0x804A1450: addiu       $v0, $t1, 0xC
+     ctx->r2 = ADD32(ctx->r9, 0XC);
+     // 0x804A1454: addiu       $v1, $zero, 0xE
+-    ctx->r3 = ADD32(0, 0X10);
++    ctx->r3 = ADD32(0, 0X12);
+ L_804A1458:
+     // 0x804A1458: sw          $zero, 0x0($v0)
+     MEM_W(0X0, ctx->r2) = 0;
+@@ -3895,7 +3908,11 @@
+     // 0x804A1490: sll         $a1, $a1, 16
+     ctx->r5 = S32(ctx->r5 << 16);
+     // 0x804A1494: beq         $t0, $a0, L_804A14B8
+-    if (ctx->r8 == ctx->r4) {
++    if (ctx->r8 == ctx->r4
++#ifdef WORKSHOP_SPECIAL_CONTENT
++        || workshop_locked_selection_node0355(rdram,(uint32_t)(ctx->r2))
++#endif
++    ) {
+         // 0x804A1498: sra         $a1, $a1, 16
+         ctx->r5 = S32(SIGNED(ctx->r5) >> 16);
+             goto L_804A14B8;
+--- a/funcs_106.c
++++ b/funcs_106.c
+@@ -1,5 +1,15 @@
+ #include "recomp.h"
+ #include "funcs.h"
++#ifdef WORKSHOP_SPECIAL_CONTENT
++#ifdef __cplusplus
++extern "C" {
++#endif
++int workshop_locked_selection_node0355(uint8_t*,uint32_t);
++int workshop_locked_selection_confirm0355(uint8_t*,recomp_context*);
++#ifdef __cplusplus
++}
++#endif
++#endif
+ 
+ RECOMP_FUNC void func_804A2714(uint8_t* rdram, recomp_context* ctx) {
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+@@ -978,6 +988,9 @@
+     c1cs = ctx->f0.fl < ctx->f26.fl;
+     // 0x804A3CA8: sra         $s1, $s1, 16
+     ctx->r17 = S32(SIGNED(ctx->r17) >> 16);
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    if(workshop_locked_selection_node0355(rdram,(uint32_t)(ctx->r2)))goto L_804A3CF0;
++#endif
+     // 0x804A3CAC: bc1f        L_804A3CF0
+     if (!c1cs) {
+         // 0x804A3CB0: nop
+@@ -1214,6 +1227,9 @@
+     c1cs = ctx->f26.fl < ctx->f0.fl;
+     // 0x804A3DC8: sra         $s1, $s1, 16
+     ctx->r17 = S32(SIGNED(ctx->r17) >> 16);
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    if(workshop_locked_selection_node0355(rdram,(uint32_t)(ctx->r2)))goto L_804A3E10;
++#endif
+     // 0x804A3DCC: bc1f        L_804A3E10
+     if (!c1cs) {
+         // 0x804A3DD0: nop
+@@ -1450,6 +1466,9 @@
+     c1cs = ctx->f0.fl < ctx->f26.fl;
+     // 0x804A3EE8: sra         $s1, $s1, 16
+     ctx->r17 = S32(SIGNED(ctx->r17) >> 16);
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    if(workshop_locked_selection_node0355(rdram,(uint32_t)(ctx->r2)))goto L_804A3F30;
++#endif
+     // 0x804A3EEC: bc1f        L_804A3F30
+     if (!c1cs) {
+         // 0x804A3EF0: nop
+@@ -1686,6 +1705,9 @@
+     c1cs = ctx->f14.fl < ctx->f26.fl;
+     // 0x804A4008: sra         $s1, $s1, 16
+     ctx->r17 = S32(SIGNED(ctx->r17) >> 16);
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    if(workshop_locked_selection_node0355(rdram,(uint32_t)(ctx->r2)))goto L_804A405C;
++#endif
+     // 0x804A400C: lwc1        $f20, 0x40($v0)
+     ctx->f20.u32l = MEM_W(ctx->r2, 0X40);
+     // 0x804A4010: bc1t        L_804A4028
+@@ -1933,6 +1955,9 @@
+     c1cs = ctx->f14.fl < ctx->f26.fl;
+     // 0x804A4134: sra         $s1, $s1, 16
+     ctx->r17 = S32(SIGNED(ctx->r17) >> 16);
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    if(workshop_locked_selection_node0355(rdram,(uint32_t)(ctx->r2)))goto L_804A4188;
++#endif
+     // 0x804A4138: lwc1        $f20, 0x40($v0)
+     ctx->f20.u32l = MEM_W(ctx->r2, 0X40);
+     // 0x804A413C: bc1t        L_804A4154
+@@ -2180,6 +2205,9 @@
+     c1cs = ctx->f26.fl < ctx->f0.fl;
+     // 0x804A4260: sra         $s1, $s1, 16
+     ctx->r17 = S32(SIGNED(ctx->r17) >> 16);
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    if(workshop_locked_selection_node0355(rdram,(uint32_t)(ctx->r2)))goto L_804A42A8;
++#endif
+     // 0x804A4264: bc1f        L_804A42A8
+     if (!c1cs) {
+         // 0x804A4268: nop
+@@ -2416,6 +2444,9 @@
+     c1cs = ctx->f26.fl < ctx->f14.fl;
+     // 0x804A4380: sra         $s1, $s1, 16
+     ctx->r17 = S32(SIGNED(ctx->r17) >> 16);
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    if(workshop_locked_selection_node0355(rdram,(uint32_t)(ctx->r2)))goto L_804A43D4;
++#endif
+     // 0x804A4384: lwc1        $f20, 0x40($v0)
+     ctx->f20.u32l = MEM_W(ctx->r2, 0X40);
+     // 0x804A4388: bc1t        L_804A43A0
+@@ -2663,6 +2694,9 @@
+     c1cs = ctx->f26.fl < ctx->f14.fl;
+     // 0x804A44AC: sra         $s1, $s1, 16
+     ctx->r17 = S32(SIGNED(ctx->r17) >> 16);
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    if(workshop_locked_selection_node0355(rdram,(uint32_t)(ctx->r2)))goto L_804A4500;
++#endif
+     // 0x804A44B0: lwc1        $f20, 0x40($v0)
+     ctx->f20.u32l = MEM_W(ctx->r2, 0X40);
+     // 0x804A44B4: bc1t        L_804A44CC
+@@ -3278,6 +3312,9 @@
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    if(workshop_locked_selection_confirm0355(rdram,ctx))return;
++#endif
+     // 0x804A4768: addiu       $sp, $sp, -0x20
+     ctx->r29 = ADD32(ctx->r29, -0X20);
+     // 0x804A476C: sw          $ra, 0x1C($sp)
+@@ -3851,6 +3888,9 @@
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    if(workshop_locked_selection_node0355(rdram,(uint32_t)(ctx->r2)))return;
++#endif
+ L_804A4874:
+     // 0x804A4AE0: lhu         $t7, 0xE($v0)
+     ctx->r15 = MEM_HU(ctx->r2, 0XE);
+@@ -3871,7 +3911,7 @@
+     // 0x804A4AF8: lui         $at, 0x8010
+     ctx->r1 = S32(0X8010 << 16);
+     // 0x804A4AFC: addu        $t7, $zero, $zero
+-    ctx->r15 = ctx->r15 == 14 ? 6 : ctx->r15 == 15 ? 7 : 0;
++    ctx->r15 = ctx->r15 == 14 ? 6 : ctx->r15 == 15 ? 7 : ctx->r15 == 16 ? 7 : ctx->r15 == 17 ? 6 : 0;
+ L_804A4B00:
+     // 0x804A4B00: sw          $t7, -0x7250($at)
+     MEM_W(-0X7250, ctx->r1) = ctx->r15;
+--- a/funcs_11.c
++++ b/funcs_11.c
+@@ -1,5 +1,12 @@
+ #include "recomp.h"
+ #include "funcs.h"
++
++#ifdef WORKSHOP_SPECIAL_CONTENT
++#ifdef __cplusplus
++extern "C"
++#endif
++void workshop_water_swim0355(uint8_t* rdram, recomp_context* ctx);
++#endif
+ 
+ RECOMP_FUNC void func_8002310C(uint8_t* rdram, recomp_context* ctx) {
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+@@ -3877,6 +3884,9 @@
+     ctx->r31 = S32(0x80024308u); /* workshop: preserve MIPS link before delay slot */
+     // 0x80024304: nop
+ 
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    workshop_water_swim0355(rdram, ctx);
++#endif
+     func_80024188(rdram, ctx);
+         goto after_0;
+     // 0x80024304: nop
+--- a/funcs_134.c
++++ b/funcs_134.c
+@@ -1,5 +1,10 @@
+ #include "recomp.h"
+ #include "funcs.h"
++
++#ifdef WORKSHOP_SPECIAL_CONTENT
++extern int workshop_bonus_active0352(void);
++extern void workshop_bonus_fruit_frame0352(uint8_t* rdram);
++#endif
+ 
+ RECOMP_FUNC void func_80569310(uint8_t* rdram, recomp_context* ctx) {
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+@@ -694,6 +699,11 @@
+     MEM_W(0X14, ctx->r29) = ctx->r31;
+     // 0x80573F9C: lhu         $v0, 0xC($a0)
+     ctx->r2 = MEM_HU(ctx->r4, 0XC);
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    /* Bonus0352: preserve the bounded native HUD; uncounted objects do not move it. */
++    if (workshop_bonus_active0352() && ctx->r2 != 0x4035 && ctx->r2 != 0x468C)
++        workshop_bonus_fruit_frame0352(rdram);
++#endif
+     // 0x80573FA0: lui         $a2, 0x800F
+     ctx->r6 = S32(0X800F << 16);
+     // 0x80573FA4: addiu       $a2, $a2, 0x7EA0
+@@ -768,6 +778,13 @@
+     MEM_H(-0X752C, ctx->r1) = ctx->r4;
+     // 0x80573FFC: addiu       $a1, $a1, 0x1
+     ctx->r5 = ADD32(ctx->r5, 0X1);
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    /* Bonus0352: record the fruit, without the ordinary thirtieth-fruit goal. */
++    if (workshop_bonus_active0352()) {
++        MEM_W(0XB30, ctx->r6) = ctx->r5 > 30 ? 30 : ctx->r5;
++        goto L_80574050;
++    }
++#endif
+     // 0x80574000: slti        $at, $a1, 0x1E
+     ctx->r1 = SIGNED(ctx->r5) < 0X1E ? 1 : 0;
+     // 0x80574004: bnel        $at, $zero, L_80574050
+@@ -938,6 +955,10 @@
+     after_1:
+     // 0x805740C8: lw          $a0, 0x1C($sp)
+     ctx->r4 = MEM_W(ctx->r29, 0X1C);
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    /* Bonus0352: the room route owns completion, not the native fruit dance. */
++    if (workshop_bonus_active0352()) goto L_80574144;
++#endif
+     // 0x805740CC: slti        $at, $a0, 0x1E
+     ctx->r1 = SIGNED(ctx->r4) < 0X1E ? 1 : 0;
+     // 0x805740D0: bnel        $at, $zero, L_80574148
+@@ -6354,6 +6375,10 @@
+     // 0x8057A9B4: slti        $at, $a3, 0x1E
+     ctx->r1 = SIGNED(ctx->r7) < 0X1E ? 1 : 0;
+ L_8057A9B8:
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    /* Bonus0352: also suppress the independent HUD observer's victory state. */
++    if (workshop_bonus_active0352()) goto L_8057AA3C;
++#endif
+     // 0x8057A9B8: bne         $at, $zero, L_8057AA3C
+     if (ctx->r1 != 0) {
+         // 0x8057A9BC: nop
+--- a/funcs_135.c
++++ b/funcs_135.c
+@@ -1,5 +1,15 @@
+ #include "recomp.h"
+ #include "funcs.h"
++#ifdef WORKSHOP_SPECIAL_CONTENT
++#ifdef __cplusplus
++extern "C" {
++#endif
++void workshop_elemental_selection_capacity0355(uint8_t*,recomp_context*);
++void workshop_locked_selection_partition0355(uint8_t*,recomp_context*);
++#ifdef __cplusplus
++}
++#endif
++#endif
+ 
+ RECOMP_FUNC void func_8057BB68(uint8_t* rdram, recomp_context* ctx) {
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+@@ -2970,6 +2980,8 @@
+     // 0x8057C99C: nop
+ 
+ ;}
++extern int workshop_selection_unknown0355(unsigned color);
++extern void workshop_selection_begin0355(uint8_t*,recomp_context*);
+ RECOMP_FUNC void func_8057D740(uint8_t* rdram, recomp_context* ctx) {
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+     workshop_trace_entry(rdram,ctx,__func__);
+@@ -3002,7 +3014,8 @@
+     // 0x8057D75C: mtc1        $a2, $f12
+     ctx->f12.u32l = ctx->r6;
+     // 0x8057D760: lhu         $t8, -0x2434($t8)
+-    ctx->r24 = MEM_HU(0, ADD32(S32(0x807FD200u), ctx->r15));
++    ctx->r24 = MEM_HU(0, ADD32(S32(0x807FD300u), ctx->r15));
++    if(workshop_selection_unknown0355((unsigned)ctx->r5))ctx->r24=0x4EFB;
+     // 0x8057D764: addiu       $sp, $sp, -0x20
+     ctx->r29 = ADD32(ctx->r29, -0X20);
+     // 0x8057D768: sll         $v0, $a1, 2
+@@ -3030,15 +3043,15 @@
+     // 0x8057D794: or          $a0, $t9, $t0
+     ctx->r4 = ctx->r25 | ctx->r8;
+     // 0x8057D798: lw          $a1, -0x2418($a1)
+-    ctx->r5 = MEM_W(0, ADD32(S32(0x807FD220u), ctx->r2));
++    ctx->r5 = MEM_W(0, ADD32(S32(0x807FD330u), ctx->r2));
+     // 0x8057D79C: jal         0x8004613C
+     ctx->r31 = ADD32(section_addresses[129], 0x64); /* workshop: preserve MIPS link before delay slot */
+     // 0x8057D7A0: lw          $a2, -0x23E0($a2)
+-    ctx->r6 = MEM_W(0, ADD32(S32(0x807FD260u), ctx->r2));
++    ctx->r6 = MEM_W(0, ADD32(S32(0x807FD380u), ctx->r2));
+     func_8004613C(rdram, ctx);
+         goto after_0;
+     // 0x8057D7A0: lw          $a2, -0x23E0($a2)
+-    ctx->r6 = MEM_W(0, ADD32(S32(0x807FD260u), ctx->r2));
++    ctx->r6 = MEM_W(0, ADD32(S32(0x807FD380u), ctx->r2));
+     after_0:
+     // 0x8057D7A4: sw          $v0, 0x1C($sp)
+     MEM_W(0X1C, ctx->r29) = ctx->r2;
+@@ -3071,6 +3084,7 @@
+ 
+ ;}
+ RECOMP_FUNC void func_8057D7D0(uint8_t* rdram, recomp_context* ctx) {
++    workshop_selection_begin0355(rdram,ctx);
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+     workshop_trace_entry(rdram,ctx,__func__);
+ #endif
+@@ -3125,14 +3139,15 @@
+ L_8057D81C:
+     // 0x8057D81C: andi        $t6, $s1, 0x1
+     ctx->r14 = ctx->r17 & 0X1;
++    if(workshop_selection_unknown0355((unsigned)ctx->r16))ctx->r14=1;
+     // 0x8057D820: beq         $t6, $zero, L_8057D8A4
+     if (ctx->r14 == 0) {
+         // 0x8057D824: slti        $at, $s0, 0xE
+-        ctx->r1 = SIGNED(ctx->r16) < 0X10 ? 1 : 0;
++        ctx->r1 = SIGNED(ctx->r16) < 0X12 ? 1 : 0;
+             goto L_8057D8A4;
+     }
+     // 0x8057D824: slti        $at, $s0, 0xE
+-    ctx->r1 = SIGNED(ctx->r16) < 0X10 ? 1 : 0;
++    ctx->r1 = SIGNED(ctx->r16) < 0X12 ? 1 : 0;
+     // 0x8057D828: bne         $at, $zero, L_8057D898
+     if (ctx->r1 != 0) {
+         // 0x8057D82C: or          $a0, $s3, $zero
+@@ -3249,7 +3264,7 @@
+     ctx->r16 = ADD32(ctx->r16, 0X1);
+ L_8057D8A8:
+     // 0x8057D8A8: slti        $at, $s0, 0xE
+-    ctx->r1 = SIGNED(ctx->r16) < 0X10 ? 1 : 0;
++    ctx->r1 = SIGNED(ctx->r16) < 0X12 ? 1 : 0;
+     // 0x8057D8AC: bne         $at, $zero, L_8057D81C
+     if (ctx->r1 != 0) {
+         // 0x8057D8B0: srl         $s1, $s1, 1
+@@ -3260,6 +3275,9 @@
+     ctx->r17 = S32(U32(ctx->r17) >> 1);
+     // 0x8057D8B4: lw          $t2, 0x188($s3)
+     ctx->r10 = MEM_W(ctx->r19, 0X188);
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    workshop_locked_selection_partition0355(rdram,ctx);
++#endif
+     // 0x8057D8B8: lui         $at, 0x1
+     ctx->r1 = S32(0X1 << 16);
+     // 0x8057D8BC: lui         $t3, 0x8010
+@@ -3293,6 +3311,9 @@
+     // 0x8057D8E0: or          $s1, $zero, $zero
+     ctx->r17 = 0 | 0;
+ L_8057D8E4:
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    workshop_elemental_selection_capacity0355(rdram,ctx);
++#endif
+     // 0x8057D8E4: beq         $s1, $zero, L_8057D93C
+     if (ctx->r17 == 0) {
+         // 0x8057D8E8: or          $s0, $zero, $zero
+--- a/funcs_15.c
++++ b/funcs_15.c
+@@ -1,5 +1,14 @@
+ #include "recomp.h"
+ #include "funcs.h"
++#ifdef WORKSHOP_SPECIAL_CONTENT
++#ifdef __cplusplus
++extern "C" {
++#endif
++int workshop_elemental_hit_loss0355(uint8_t* rdram, recomp_context* ctx);
++#ifdef __cplusplus
++}
++#endif
++#endif
+ 
+ RECOMP_FUNC void func_800292D4(uint8_t* rdram, recomp_context* ctx) {
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+@@ -7614,7 +7623,11 @@
+     // 0x8002B6F0: sw          $s0, 0x20($sp)
+     MEM_W(0X20, ctx->r29) = ctx->r16;
+     // 0x8002B6F4: addiu       $s0, $s0, -0x3
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    ctx->r16 = ADD32(ctx->r16, -workshop_elemental_hit_loss0355(rdram,ctx));
++#else
+     ctx->r16 = ADD32(ctx->r16, -0X3);
++#endif
+     // 0x8002B6F8: bgtz        $s0, L_8002B760
+     if (SIGNED(ctx->r16) > 0) {
+         // 0x8002B6FC: nop
+--- a/funcs_18.c
++++ b/funcs_18.c
+@@ -1,5 +1,15 @@
+ #include "recomp.h"
+ #include "funcs.h"
++#ifdef WORKSHOP_SPECIAL_CONTENT
++#ifdef __cplusplus
++extern "C" {
++#endif
++void workshop_elemental_hit_begin0355(uint8_t* rdram, recomp_context* ctx);
++void workshop_elemental_hit_end0355(uint8_t* rdram, recomp_context* ctx);
++#ifdef __cplusplus
++}
++#endif
++#endif
+ 
+ RECOMP_FUNC void func_8002E90C(uint8_t* rdram, recomp_context* ctx) {
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+@@ -2793,6 +2803,9 @@
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+     workshop_trace_entry(rdram,ctx,__func__);
+ #endif
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    workshop_elemental_hit_begin0355(rdram,ctx);
++#endif
+     uint64_t hi = 0, lo = 0, result = 0;
+     int c1cs = 0;
+     // 0x8002F6E4: addiu       $sp, $sp, -0x20
+@@ -2931,6 +2944,9 @@
+     // 0x8002F7A4: jr          $ra
+     // 0x8002F7A8: nop
+ 
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    workshop_elemental_hit_end0355(rdram,ctx);
++#endif
+     return;
+     // 0x8002F7A8: nop
+ 
+--- a/funcs_204.c
++++ b/funcs_204.c
+@@ -1,5 +1,9 @@
+ #include "recomp.h"
+ #include "funcs.h"
++#ifdef WORKSHOP_SPECIAL_CONTENT
++extern int workshop_bonus_bowser_midpoint0353(uint8_t*,recomp_context*);
++extern int workshop_bonus_bowser_preserve0353(uint8_t*,recomp_context*);
++#endif
+ 
+ RECOMP_FUNC void func_8079BA0C(uint8_t* rdram, recomp_context* ctx) {
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+@@ -703,6 +707,9 @@
+     ctx->r24 = ADD32(ctx->r15, 0X1);
+     // 0x8079BDAC: slti        $at, $t8, 0x1F0
+     ctx->r1 = SIGNED(ctx->r24) < 0X1F0 ? 1 : 0;
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    if(workshop_bonus_bowser_midpoint0353(rdram,ctx))ctx->r1=0;
++#endif
+     // 0x8079BDB0: bne         $at, $zero, L_8079BEB0
+     if (ctx->r1 != 0) {
+         // 0x8079BDB4: sw          $t8, 0x1E0($a0)
+@@ -712,6 +719,9 @@
+     // 0x8079BDB4: sw          $t8, 0x1E0($a0)
+     MEM_W(0X1E0, ctx->r4) = ctx->r24;
+     // 0x8079BDB8: sw          $zero, 0x1E0($a0)
++    #ifdef WORKSHOP_SPECIAL_CONTENT
++    if(!workshop_bonus_bowser_preserve0353(rdram,ctx))
++#endif
+     MEM_W(0X1E0, ctx->r4) = 0;
+     // 0x8079BDBC: lw          $t1, 0xE94($v0)
+     ctx->r9 = MEM_W(ctx->r2, 0XE94);
+--- a/funcs_211.c
++++ b/funcs_211.c
+@@ -3213,7 +3213,7 @@
+     MEM_W(0X138, ctx->r2) = ctx->r15;
+     // 0x807BA4DC: lw          $t9, -0x7250($t9)
+     ctx->r25 = MEM_W(ctx->r25, -0X7250);
+-    { uint32_t color=MEM_W(0,(gpr)(int32_t)0x807F0008); if(color<16)ctx->r25=color; }
++    { uint32_t color=MEM_W(0,(gpr)(int32_t)0x807F0008); if(color<18)ctx->r25=color; }
+     // 0x807BA4E0: lw          $v0, 0x88($t8)
+     ctx->r2 = MEM_W(ctx->r24, 0X88);
+     // 0x807BA4E4: sw          $a0, 0x24($sp)
+--- a/funcs_213.c
++++ b/funcs_213.c
+@@ -812,7 +812,7 @@
+     // 0x807C37E4: lw          $t0, 0x168($a0)
+     ctx->r8 = MEM_W(ctx->r4, 0X168);
+     // 0x807C37E8: lw          $t3, 0x4858($t3)
+-    ctx->r11 = MEM_W(0, ADD32(S32(0x807FD2A0u), ctx->r10));
++    ctx->r11 = MEM_W(0, ADD32(S32(0x807FD3D0u), ctx->r10));
+     // 0x807C37EC: lw          $v0, 0x88($t0)
+     ctx->r2 = MEM_W(ctx->r8, 0X88);
+     // 0x807C37F0: sll         $t4, $t3, 1
+--- a/funcs_214.c
++++ b/funcs_214.c
+@@ -914,7 +914,7 @@
+     // 0x807F1824: addiu       $t1, $a1, -0x8
+     ctx->r9 = ADD32(ctx->r5, -0X8);
+     // 0x807F1828: sltiu       $t1, $t1, 0x6
+-    ctx->r9 = ctx->r9 < 0X8 ? 1 : 0;
++    ctx->r9 = ctx->r9 < 0XA ? 1 : 0;
+     // 0x807F182C: beq         $t1, $zero, L_807F183C
+     if (ctx->r9 == 0) {
+         // 0x807F1830: nop
+@@ -982,7 +982,7 @@
+     // 0x807F1C10: lui         $t0, 0x8010
+     ctx->r8 = S32(0X8010 << 16);
+     // 0x807F1C14: sltiu       $t1, $v0, 0xE
+-    ctx->r9 = ctx->r2 < 0X10 ? 1 : 0;
++    ctx->r9 = ctx->r2 < 0X12 ? 1 : 0;
+     // 0x807F1C18: beq         $t1, $zero, L_807F1CA0
+     if (ctx->r9 == 0) {
+         // 0x807F1C1C: addiu       $t2, $v0, 0x1
+@@ -4704,7 +4704,7 @@
+     int c1cs = 0;
+     if(workshop_hard_picker0330(rdram,ctx))return;
+     // 0x807F3B38: addiu       $sp, $sp, -0x68
+-    ctx->r29 = ADD32(ctx->r29, -0X70);
++    ctx->r29 = ADD32(ctx->r29, -0X80);
+     // 0x807F3B3C: sw          $ra, 0x14($sp)
+     MEM_W(0X14, ctx->r29) = ctx->r31;
+     // 0x807F3B40: lui         $t6, 0x8010
+@@ -4773,7 +4773,7 @@
+     // 0x807F3B9C: or          $v1, $zero, $zero
+     ctx->r3 = 0 | 0;
+     // 0x807F3BA0: addiu       $a3, $zero, 0x6
+-    ctx->r7 = ADD32(0, 0X8);
++    ctx->r7 = ADD32(0, 0XA);
+     // 0x807F3BA4: addiu       $t4, $zero, 0x1
+     ctx->r12 = ADD32(0, 0X1);
+ L_807F3BA8:
+@@ -4893,10 +4893,10 @@
+     ctx->r1 = ADD32(0, 0X1);
+     // 0x807F3C34: b           L_807F3C80
+     // 0x807F3C38: addiu       $v0, $zero, 0xE
+-    ctx->r2 = ADD32(0, 0X10);
++    ctx->r2 = ADD32(0, 0X12);
+         goto L_807F3C80;
+     // 0x807F3C38: addiu       $v0, $zero, 0xE
+-    ctx->r2 = ADD32(0, 0X10);
++    ctx->r2 = ADD32(0, 0X12);
+ L_807F3C3C:
+     // 0x807F3C3C: bne         $a1, $at, L_807F3C4C
+     if (ctx->r5 != ctx->r1) {
+@@ -4953,7 +4953,7 @@
+     // 0x807F3C80: lw          $ra, 0x14($sp)
+     ctx->r31 = MEM_W(ctx->r29, 0X14);
+     // 0x807F3C84: addiu       $sp, $sp, 0x68
+-    ctx->r29 = ADD32(ctx->r29, 0X70);
++    ctx->r29 = ADD32(ctx->r29, 0X80);
+     // 0x807F3C88: jr          $ra
+     // 0x807F3C8C: nop
+ 
+--- a/funcs_26.c
++++ b/funcs_26.c
+@@ -1,5 +1,14 @@
+ #include "recomp.h"
+ #include "funcs.h"
++#ifdef WORKSHOP_SPECIAL_CONTENT
++#ifdef __cplusplus
++extern "C" {
++#endif
++void workshop_elemental_flame_food_gate0355(uint8_t*,recomp_context*);
++#ifdef __cplusplus
++}
++#endif
++#endif
+ 
+ RECOMP_FUNC void func_8003B2DC(uint8_t* rdram, recomp_context* ctx) {
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+@@ -4097,6 +4106,9 @@
+     ctx->r2 = MEM_HU(ctx->r3, 0X1C);
+     // 0x8003C660: andi        $v0, $v0, 0xC0
+     ctx->r2 = ctx->r2 & 0XC0;
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    workshop_elemental_flame_food_gate0355(rdram,ctx);
++#endif
+     // 0x8003C664: beq         $v0, $at, L_8003C68C
+     if (ctx->r2 == ctx->r1) {
+         // 0x8003C668: addiu       $at, $zero, 0x80
+--- a/funcs_37.c
++++ b/funcs_37.c
+@@ -2823,7 +2823,7 @@
+     // 0x80050C90: addiu       $t0, $a1, -0x4EF1
+     ctx->r8 = ADD32(ctx->r5, -0X4EF1);
+     // 0x80050C94: sltiu       $t1, $t0, 0x6
+-    ctx->r9 = ctx->r8 < 0X8 ? 1 : 0;
++    ctx->r9 = ctx->r8 < 0XB ? 1 : 0;
+     // 0x80050C98: beq         $t1, $zero, L_80050CB8
+     if (ctx->r9 == 0) {
+         // 0x80050C9C: sll         $t1, $t0, 1
+--- a/funcs_39.c
++++ b/funcs_39.c
+@@ -1,5 +1,8 @@
+ #include "recomp.h"
+ #include "funcs.h"
++#ifdef WORKSHOP_SPECIAL_CONTENT
++extern uint32_t workshop_elemental_terrain_word(uint8_t* rdram,uint32_t actor,uint32_t raw);
++#endif
+ 
+ RECOMP_FUNC void func_80052C98(uint8_t* rdram, recomp_context* ctx) {
+ #ifdef WORKSHOP_SPECIAL_CONTENT
+@@ -1621,6 +1624,14 @@
+     // 0x800535A8: sh          $a1, 0x1A($sp)
+     MEM_H(0X1A, ctx->r29) = ctx->r5;
+     after_3:
++#ifdef WORKSHOP_SPECIAL_CONTENT
++    // Fire0355: project this player query only; no terrain, HP or position writes.
++    {
++        const gpr oldMaterial0355 = ctx->r2;
++        const uint32_t material0355 = workshop_elemental_terrain_word(rdram,(uint32_t)MEM_W(0X2C,ctx->r29),(uint32_t)oldMaterial0355);
++        if (material0355 != (uint32_t)oldMaterial0355) ctx->r2 = S32(material0355);
++    }
++#endif
+     // 0x800535AC: ori         $at, $zero, 0xFFFF
+     ctx->r1 = 0 | 0XFFFF;
+     // 0x800535B0: bne         $v0, $at, L_800535C0
+--- a/funcs_43.c
++++ b/funcs_43.c
+@@ -4318,6 +4318,8 @@
+ RECOMP_FUNC void func_8005D320(uint8_t* rdram, recomp_context* ctx) {
+ #endif
+ #ifdef WORKSHOP_SPECIAL_CONTENT
++    extern int workshop_bonus_depart0352(uint8_t*,recomp_context*);
++    if(workshop_bonus_depart0352(rdram,ctx))return;
+     workshop_trace_entry(rdram,ctx,"func_8005D320");
+ #endif
+     uint64_t hi = 0, lo = 0, result = 0;

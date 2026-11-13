@@ -26,8 +26,31 @@ target_sources(DinoTale PRIVATE ${CMAKE_CURRENT_LIST_DIR}/hybrid_mode.cpp
     ${CMAKE_CURRENT_LIST_DIR}/story_hard_bridge0330.cpp)
 target_sources(DinoTale PRIVATE ${CMAKE_CURRENT_LIST_DIR}/hybrid_completion0290.cpp)
 target_sources(DinoTale PRIVATE ${CMAKE_CURRENT_LIST_DIR}/metal_yoshis0300.cpp)
-target_sources(DinoTale PRIVATE ${CMAKE_CURRENT_LIST_DIR}/gold_silver_resources0300.cpp)
+target_sources(DinoTale PRIVATE ${CMAKE_CURRENT_LIST_DIR}/gold_silver_resources0300.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/elemental_resources0355.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/unknown_yoshi_resources0355.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/elemental_yoshis0355.cpp)
 target_sources(DinoTale PRIVATE ${CMAKE_CURRENT_LIST_DIR}/hybrid_finds.cpp)
+
+target_sources(DinoTale PRIVATE ${CMAKE_CURRENT_LIST_DIR}/trial_special_lives0350.cpp)
+
+target_sources(DinoTale PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/bonus_routes0351.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/bonus_session0351.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/bonus_rooms0351.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/bonus_plan0351.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/bonus_runtime0352.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/bonus_transport0352.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/bonus_game0352.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/bonus_retry0353.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/bonus_authoring0353.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/bonus_finales0353.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/bonus_factory0353.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/bonus_bowser0353.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/bonus_exit_policy0353.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/bonus_finale_bridge0353.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/bonus_finale_entries0353.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/bonus_finale_links0353.cpp)
 target_sources(DinoTale PRIVATE ${CMAKE_CURRENT_LIST_DIR}/linux_process.cpp)
 add_custom_command(TARGET DinoTale POST_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory
     $<TARGET_FILE_DIR:DinoTale>/assets/workshop-menu
@@ -48,6 +71,13 @@ if(WORKSHOP_NATIVE_COOP)
     target_sources(DinoTale PRIVATE ${CMAKE_CURRENT_LIST_DIR}/coop_native_dispatch.cpp)
     target_sources(DinoTale PRIVATE ${CMAKE_CURRENT_LIST_DIR}/boss_solo_dispatch0240.cpp)
     target_sources(DinoTale PRIVATE ${CMAKE_CURRENT_LIST_DIR}/boss_battle_dispatch0250.cpp)
+    if(MSVC)
+        # These C-linkage native callbacks can propagate a C++ host exception.
+        # Keep per-draw palette RAII active across that boundary, including
+        # clang-cl builds whose global /EHsc otherwise assumes C cannot throw.
+        set_property(SOURCE ${CMAKE_CURRENT_LIST_DIR}/boss_battle_dispatch0250.cpp
+            APPEND PROPERTY COMPILE_OPTIONS /EHs /EHc-)
+    endif()
     target_sources(DinoTale PRIVATE ${CMAKE_CURRENT_LIST_DIR}/boss_blargg_dispatch0289.cpp)
     target_compile_definitions(DinoTale PRIVATE WORKSHOP_NATIVE_COOP)
     target_compile_definitions(RecompiledFuncs PRIVATE WORKSHOP_NATIVE_COOP)

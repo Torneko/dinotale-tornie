@@ -171,9 +171,13 @@ extern "C" void func_805C9154(uint8_t* r,recomp_context* c){
  if(!workshop_battle_hook_enter(r,c,"func_805C9154"))battle_original_func_805C9154(r,c);
  workshop_battle_hook_leave(r,&entry,"func_805C9154");if(paint)workshop_battle_paint_finish(r);
 }
+extern "C" uint64_t workshop_elemental_tongue_begin0355(uint8_t*,uint32_t);
+extern "C" void workshop_elemental_tongue_end0355(uint8_t*,uint64_t)noexcept;
 extern "C" void battle_original_func_8005F700(uint8_t*,recomp_context*);
 extern "C" void func_8005F700(uint8_t* r,recomp_context* c){
- const auto entry=*c;const auto owner=workshop_coop_dispatch_enter(r,c,0x8005F700,uint32_t(entry.r4),uint32_t(entry.r5));const bool paint=workshop_battle_paint_begin(r,c,0x8005F700);
+ const auto entry=*c;const auto owner=workshop_coop_dispatch_enter(r,c,0x8005F700,uint32_t(entry.r4),uint32_t(entry.r5));
+ struct TongueDraw {uint8_t* ram;uint64_t token;~TongueDraw(){workshop_elemental_tongue_end0355(ram,token);}} tongue{r,workshop_elemental_tongue_begin0355(r,uint32_t(entry.r4))};
+ const bool paint=workshop_battle_paint_begin(r,c,0x8005F700);
  if(!workshop_battle_hook_enter(r,c,"func_8005F700"))battle_original_func_8005F700(r,c);
  workshop_battle_hook_leave(r,&entry,"func_8005F700");if(paint)workshop_battle_paint_finish(r);workshop_coop_dispatch_leave(r,c,0x8005F700,uint32_t(entry.r4),uint32_t(entry.r5),owner,1);
 }

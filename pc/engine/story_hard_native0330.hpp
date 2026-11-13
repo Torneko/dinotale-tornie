@@ -6,7 +6,7 @@
 #include <optional>
 
 namespace workshop::story_hard_native0330 {
-inline constexpr unsigned mode=6,all_colors=0xFFFF,none=16;
+inline constexpr unsigned mode=6,all_colors=0x3FFFF,none=18;
 struct Team {unsigned found=1,alive=1;};
 using NativeContinuation14=std::array<uint8_t,14>;
 inline std::optional<NativeContinuation14> read_continuation(uint8_t* rdram){
@@ -21,7 +21,7 @@ constexpr unsigned dead(Team team){return valid(team)?team.found&~team.alive&all
 constexpr unsigned rescue_pick(Team team,unsigned ordinal){
     const auto candidates=dead(team);
     if(ordinal>=unsigned(std::popcount(candidates)))return none;
-    for(unsigned color=0;color<16;color++)if(candidates&(1u<<color)){if(!ordinal)return color;--ordinal;}
+    for(unsigned color=0;color<18;color++)if(candidates&(1u<<color)){if(!ordinal)return color;--ordinal;}
     return none;
 }
 // Game-thread adapter only. Scope must exclude custom/diagnostic/deferred
@@ -37,7 +37,7 @@ class Adapter {
     static gpr at(uint32_t p){return gpr(int32_t(p));}
     static uint32_t word(uint8_t* rdram,uint32_t p){return uint32_t(MEM_W(0,at(p)));}
     static void word(uint8_t* rdram,uint32_t p,uint32_t value){MEM_W(0,at(p))=value;}
-    static unsigned ram_team(uint8_t* rdram){return (word(rdram,0x800F8DF4)&255)|((word(rdram,0x807F1000)&255)<<8);}
+    static unsigned ram_team(uint8_t* rdram){return (word(rdram,0x800F8DF4)&255)|((word(rdram,0x807F1000)&1023)<<8);}
     static bool player_identity(uint8_t* rdram,uint32_t player,uint32_t data){return range(player,0x200)&&range(data,0x1300)&&word(rdram,player)==0x19971110&&MEM_HU(12,at(player))==0x4001&&word(rdram,player+0x1F4)==data&&word(rdram,0x800F8828)==player;}
     void clear_pending(){loss_={};rescue_={};}
 public:
@@ -52,14 +52,14 @@ public:
         return read_continuation(rdram);
     }
     std::optional<unsigned> available(uint8_t* rdram,Team team)const{if(!enabled(rdram)||!valid(team))return {};return team.alive;}
-    std::optional<unsigned> saved_extras(uint8_t* rdram,Team team)const{if(!enabled(rdram)||!valid(team))return {};return (team.alive>>8)&255;}
-    std::optional<unsigned> capacity(uint8_t* rdram,Team team)const{if(!enabled(rdram)||!valid(team))return {};return dead(team)!=0;}
+    std::optional<unsigned> saved_extras(uint8_t* rdram,Team team)const{if(!enabled(rdram)||!valid(team))return {};return (team.alive>>8)&1023;}
+    std::optional<unsigned> capacity(uint8_t* rdram,Team team)const{if(!enabled(rdram)||!valid(team))return {};const auto pending=(word(rdram,0x800F8DF4)>>14)&7;return pending<unsigned(std::popcount(dead(team)));}
     std::optional<unsigned> picker(uint8_t* rdram,Team team,unsigned ordinal)const{if(!enabled(rdram)||!valid(team))return {};return rescue_pick(team,ordinal);}
     bool project(uint8_t* rdram,Team team)const{
         if(!enabled(rdram)||!valid(team))return false;
         const auto flags=word(rdram,0x800F8DF4);
         word(rdram,0x800F8DF4,(flags&~255u)|(team.alive&255));
-        word(rdram,0x807F1000,(team.alive>>8)&255);return true;
+        word(rdram,0x807F1000,(team.alive>>8)&1023);return true;
     }
     // BEFORE80444838, after native reconstruction of base lives/continuation.
     // Caller decides fresh/new_run versus continuing using its journal; this
@@ -73,12 +73,12 @@ public:
     bool loss_enter(uint8_t* rdram,recomp_context* context,Team team){
         loss_={};if(!context||!enabled(rdram)||!valid(team)||ram_team(rdram)!=team.alive)return false;
         const unsigned color=uint32_t(context->r9);const auto player=uint32_t(context->r4),stack=uint32_t(context->r29);
-        if(color>=16||word(rdram,0x807F0008)!=color||!(team.alive&(1u<<color))||!range(stack,0x18)||!range(player,0x200))return false;
+        if(color>=18||word(rdram,0x807F0008)!=color||!(team.alive&(1u<<color))||!range(stack,0x18)||!range(player,0x200))return false;
         const auto data=word(rdram,player+0x1F4);if(!player_identity(rdram,player,data))return false;
         const auto after=team.alive&~(1u<<color);
         loss_={true,nonce_,color,team.alive,after,stack,player,data};
         if(!project(rdram,{team.found,after})){loss_={};return false;}
-        context->r10=(after>>8)&255;context->r12=word(rdram,0x800F8DF4);return true;
+        context->r10=(after>>8)&1023;context->r12=word(rdram,0x800F8DF4);return true;
     }
     // BEFORE807F1174, after either the native clear or the exact Hard clear.
     // Root persists lose_yoshi ONLY for this matching receipt. Remaining-life
@@ -93,7 +93,7 @@ public:
     bool rescue_enter(uint8_t* rdram,const recomp_context* context,Team team){
         rescue_={};if(!context||!enabled(rdram)||!valid(team)||ram_team(rdram)!=team.alive)return false;
         const unsigned color=uint32_t(context->r2);const auto stack=uint32_t(context->r29);
-        if(color>=16||!(dead(team)&(1u<<color))||!range(stack,0x18)||uint32_t(context->r8)!=0x80100000||uint32_t(context->r10)!=color+1)return false;
+        if(color>=18||!(dead(team)&(1u<<color))||!range(stack,0x18)||uint32_t(context->r8)!=0x80100000||uint32_t(context->r10)!=color+1)return false;
         rescue_={true,nonce_,color,team.alive,team.alive|(1u<<color),stack,0,0};return true;
     }
     // BEFORE807F1C5C: the real native OR has happened, while its subsequent

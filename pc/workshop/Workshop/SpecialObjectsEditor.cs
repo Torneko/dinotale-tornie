@@ -31,7 +31,7 @@ public sealed partial class WorkshopWindow {
         foreach(var id in ids)specialObjectChoice.Items.Add(new SpecialOption(id,ObjectCatalog.Get(id).Name));
         specialObjectChoice.SelectedItem=specialObjectChoice.Items.Cast<SpecialOption>().FirstOrDefault(o=>o.Id==previous);if(specialObjectChoice.SelectedIndex<0 && specialObjectChoice.Items.Count>0)specialObjectChoice.SelectedIndex=0;
         addSpecialObject.Enabled=specialObjectChoice.SelectedItem!=null;
-        specialAvailability.Text=eggs?"Les dix couleurs d’œufs sont disponibles ici. Les trouvailles restent réservées à cette création et ne débloquent pas les Yoshis de la partie personnelle.":"Les œufs spéciaux sont disponibles dans les salles contenant déjà une bulle d’œuf d’origine : certaines salles du 2-1, 2-4, 3-2 et 3-3.";
+        specialAvailability.Text=eggs?"Les douze couleurs d’œufs sont disponibles ici. Les trouvailles restent réservées à cette création et ne débloquent pas les Yoshis de la partie personnelle.":"Les œufs spéciaux sont disponibles dans les salles contenant déjà une bulle d’œuf d’origine : certaines salles du 2-1, 2-4, 3-2 et 3-3.";
         if(specialObjectChoice.Items.Count==0)specialObjectInfo.Text="Aucun objet spécial disponible dans cette salle.";
         RefreshSpecialRooms();
     }
@@ -61,7 +61,7 @@ public sealed partial class WorkshopWindow {
     void RefreshSpecialRoomSelection(){
         var room=specialRooms.SelectedItem as SpecialRoomOption;visitSpecialRoom.Enabled=room!=null && room.Zone!=activeRoom;
         if(room==null){specialRoomInfo.Text=current==null?"Choisir un niveau.":"Aucun objet spécial disponible dans les salles incluses. Tu peux ajouter les autres salles d’origine depuis le sélecteur de salle.";return;}
-        var names=new List<string>();if(room.Objects.Any(SpecialEditorObjects.IsEgg))names.Add("Œufs de Yoshi en bulle · 10 couleurs");
+        var names=new List<string>();if(room.Objects.Any(SpecialEditorObjects.IsEgg))names.Add("Œufs de Yoshi en bulle · 12 couleurs");
         names.AddRange(room.Objects.Where(id=>!SpecialEditorObjects.IsEgg(id)).Select(id=>ObjectCatalog.Get(id).Name));
         specialRoomInfo.Text=$"Niveau {VanillaRom.SourceCode(current!.SourceZone)} · {RoomLabel(room.Zone)}"+(room.Zone==activeRoom?" · salle actuelle":"")+"\n\n"+string.Join("\n",names);
     }
@@ -82,16 +82,16 @@ public sealed partial class WorkshopWindow {
         if(specialObjectsTab?.Parent is TabControl inspector)inspector.SelectedTab=specialObjectsTab;
         string beforeNavigation=JsonSerializer.Serialize(current,ProjectStore.Json);int beforeHistory=undo.Count;bool beforeDirty=dirty;
         if(specialRoomsOpen)showSpecialRooms.PerformClick();showSpecialRooms.PerformClick();
-        Need(specialRooms.Visible && specialRooms.Items.Cast<SpecialRoomOption>().Any(o=>o.Zone==120 && o.Objects.Count(SpecialEditorObjects.IsEgg)==10),"Compatible secondary egg room absent");
+        Need(specialRooms.Visible && specialRooms.Items.Cast<SpecialRoomOption>().Any(o=>o.Zone==120 && o.Objects.Count(SpecialEditorObjects.IsEgg)==12),"Compatible secondary egg room absent");
         specialRooms.SelectedItem=specialRooms.Items.Cast<SpecialRoomOption>().Single(o=>o.Zone==120);
         Need(visitSpecialRoom.Enabled && specialRoomInfo.Text.Contains("10 couleurs"),"Compatible room description or navigation absent");visitSpecialRoom.PerformClick();
         Need(activeRoom==120 && specialRooms.SelectedItem is SpecialRoomOption {Zone:120} selectedRoom && selectedRoom.Label.Contains("salle actuelle") && !visitSpecialRoom.Enabled,"Compatible room did not become current");
         Need(JsonSerializer.Serialize(current,ProjectStore.Json)==beforeNavigation && undo.Count==beforeHistory && dirty==beforeDirty,"Room discovery changed project/history/dirty state");
-        Need(specialObjectChoice.Items.Cast<SpecialOption>().Count(o=>SpecialEditorObjects.IsEgg(o.Id))==10,"Ten egg choices absent");
+        Need(specialObjectChoice.Items.Cast<SpecialOption>().Count(o=>SpecialEditorObjects.IsEgg(o.Id))==12,"Twelve egg choices absent");
         string primary=JsonSerializer.Serialize(current!.Objects,ProjectStore.Json);undo.Clear();redo.Clear();var ids=new List<string>();
-        for(int i=0;i<10;i++){canvas.FocusAt(48+i*40,240,1);specialObjectChoice.SelectedItem=specialObjectChoice.Items.Cast<SpecialOption>().Single(o=>o.Id==0x4F30+i);addSpecialObject.PerformClick();Need(canvas.Selected?.ObjectId==0x4F30+i,"Wrong egg added");ids.Add(canvas.Selected!.Id);}
-        Need(undo.Count==10 && JsonSerializer.Serialize(current.Objects,ProjectStore.Json)==primary,"Egg addition history/room isolation failed");
-        Undo();Need(!SceneObjects.Any(p=>p.Id==ids[9]),"Egg undo failed");Redo();Need(SceneObjects.Single(p=>p.Id==ids[9]).ObjectId==0x4F39,"Egg redo failed");
+        for(int i=0;i<12;i++){canvas.FocusAt(48+i*40,240,1);specialObjectChoice.SelectedItem=specialObjectChoice.Items.Cast<SpecialOption>().Single(o=>o.Id==0x4F30+i);addSpecialObject.PerformClick();Need(canvas.Selected?.ObjectId==0x4F30+i,"Wrong egg added");ids.Add(canvas.Selected!.Id);}
+        Need(undo.Count==12 && JsonSerializer.Serialize(current.Objects,ProjectStore.Json)==primary,"Egg addition history/room isolation failed");
+        Undo();Need(!SceneObjects.Any(p=>p.Id==ids[11]),"Egg undo failed");Redo();Need(SceneObjects.Single(p=>p.Id==ids[11]).ObjectId==0x4F3B,"Egg redo failed");
         SaveLevel();string id=current.Id;LoadLevel(store.Levels().Single(l=>l.Id==id));roomChoice.SelectedItem=roomChoice.Items.Cast<RoomOption>().Single(r=>r.Zone==120);Need(ids.All(key=>SceneObjects.Any(p=>p.Id==key)),"Eggs lost after reload");
         terrainToolChoice.SelectedIndex=0;canvas.SetObjectSelection(SceneObjects.Where(p=>ids.Take(2).Contains(p.Id)).ToArray());int before=SceneObjects.Count;DuplicateSelectedObjects();Need(SceneObjects.Count==before+2 && canvas.SelectedObjects.All(p=>SpecialEditorObjects.IsEgg(p.ObjectId)),"Egg group duplication failed");Undo();
         roomChoice.SelectedIndex=0;Need(!specialObjectChoice.Items.Cast<SpecialOption>().Any(o=>SpecialEditorObjects.IsEgg(o.Id)),"Incompatible room exposes eggs");
@@ -101,6 +101,6 @@ public sealed partial class WorkshopWindow {
         Need(specialRooms.Items.Cast<SpecialRoomOption>().Any(o=>o.Zone==activeRoom && o.Objects.Contains((ushort)0x45E3)),"Current black carrier room absent from discovery");
         Need(specialObjectChoice.Items.Cast<SpecialOption>().Any(o=>o.Id==0x45E3) && specialObjectChoice.Items.Cast<SpecialOption>().Any(o=>o.Id==0x45E5),"Black carrier choices absent");
         specialObjectChoice.SelectedItem=specialObjectChoice.Items.Cast<SpecialOption>().Single(o=>o.Id==0x45E3);int blackBefore=SceneObjects.Count;addSpecialObject.PerformClick();Need(SceneObjects.Count==blackBefore+1 && canvas.Selected?.ObjectId==0x45E3,"Standalone black carrier add failed");Undo();Need(SceneObjects.Count==blackBefore,"Black carrier undo failed");SaveLevel();
-                Directory.CreateDirectory(Path.Combine(pcRoot,"build/editor-0200"));File.WriteAllText(Path.Combine(pcRoot,"build/editor-0200/ui-specials.json"),JsonSerializer.Serialize(new{tenEggChoices=true,correctColors=true,primaryRoomUntouched=true,oneUndoPerAdd=true,undoRedo=true,saveReload=true,groupDuplication=true,incompatibleRoomHidden=true,blackCarrierChoices=true,blackCarrierAddUndo=true,compatibleRoomDiscovery=true,currentRoomMarked=true,compatibleRoomNavigation=true,discoveryDoesNotEditProject=true,compatibleRoomsRefreshWithLevel=true},ProjectStore.Json));
+                Directory.CreateDirectory(Path.Combine(pcRoot,"build/editor-0200"));File.WriteAllText(Path.Combine(pcRoot,"build/editor-0200/ui-specials.json"),JsonSerializer.Serialize(new{twelveEggChoices=true,correctColors=true,primaryRoomUntouched=true,oneUndoPerAdd=true,undoRedo=true,saveReload=true,groupDuplication=true,incompatibleRoomHidden=true,blackCarrierChoices=true,blackCarrierAddUndo=true,compatibleRoomDiscovery=true,currentRoomMarked=true,compatibleRoomNavigation=true,discoveryDoesNotEditProject=true,compatibleRoomsRefreshWithLevel=true},ProjectStore.Json));
     }
 }

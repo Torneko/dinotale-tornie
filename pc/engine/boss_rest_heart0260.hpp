@@ -1,5 +1,6 @@
 #pragma once
 #include "boss_native.hpp"
+#include "yoshi_colors0300.hpp"
 #include <bit>
 #include <cmath>
 #include <cstdint>
@@ -105,7 +106,7 @@ public:
   if(name=="func_806E7728"&&b.actor&&a==b.actor){
    if(pending_.active||!identity(ram,b)||n::byte(ram,a+0x17D)!=2||n::byte(ram,a+0x18)!=3||n::word(ram,a+0x20)!=b.factory+0x4E8||contact_.birth!=b.birth||!contact_.accepted||f.vi<contact_.vi||!n::actor(ram,f.player,0x4001)||n::word(ram,0x800F8828)!=f.player){fail("heart_collection_without_contact_proof");return false;}
    const auto color=n::word(ram,0x800F8DB0),pc=n::word(ram,0x807F0008),count=n::word(ram,heart_count_address);
-   if(color>=8||pc>=14||count==std::numeric_limits<uint32_t>::max()){fail("heart_collect_owner_rejected");return false;}
+   if(color>=8||pc>=18||color!=yoshi_colors0300::native_alias(pc)||count==std::numeric_limits<uint32_t>::max()){fail("heart_collect_owner_rejected");return false;}
    pending_={b,f.player,color,pc,count,f.vi,true,false,false,false};
   }
   if(name=="func_800447C8"&&pending_.active&&a==pending_.identity.actor&&ra==pending_.identity.factory+0x560&&collect_context(ram,f)&&identity(ram,pending_.identity))pending_.retire_requested=true;

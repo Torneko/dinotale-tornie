@@ -67,7 +67,7 @@ inline bool prepare(uint8_t* ram,const recomp_context* context,uint32_t player,u
         iv::Scale scale{};
         if(result.original.count<wallet::start_eggs&&!iv::normal_scale(ram,player,scale))return false;
         result.target.count=wallet::start_eggs;
-        for(unsigned i=result.original.count;i<wallet::start_eggs;++i)result.target.eggs[i]={0x4004,result.target.pc_color,scale};
+        for(unsigned i=result.original.count;i<wallet::start_eggs;++i)result.target.eggs[i]={0x4004,yoshi_colors0300::elemental(result.target.pc_color)?yoshi_colors0300::native_alias(result.target.pc_color):result.target.pc_color,scale};
     }
     if(!iv::valid(result.target))return false;
     if(!solo_extended&&(!boss_checkpoint_inventory0260::valid(result.before)||!boss_checkpoint_inventory0260::valid(result.target)))return false;
