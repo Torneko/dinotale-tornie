@@ -2,7 +2,7 @@ name: Bilingual guide
 on:
   push:
     branches: [main]
-    paths: ["website/**", "scripts/check-site.py", ".github/workflows/website.yml"]
+    paths: ["website/**", "scripts/check-site.py", "scripts/check-spoilers.cjs", ".github/workflows/website.yml"]
   workflow_dispatch:
 permissions:
   contents: read

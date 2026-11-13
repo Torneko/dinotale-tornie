@@ -220,3 +220,14 @@ code { padding: 2px 5px; border: 1px solid #465841; border-radius: 4px; backgrou
   .actions { gap: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+/* Details only enter the document after an explicit spoiler acknowledgement. */
+.spoiler-gate { max-width: 850px; margin: 54px auto 24px; padding: 30px clamp(22px, 4vw, 44px); border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.spoiler-gate h1 { margin: 14px 0 20px; font: 500 clamp(29px, 4vw, 42px)/1.2 Georgia, serif; color: var(--ink); }
+.spoiler-gate p { max-width: 72ch; color: #bdc9b7; }
+.spoiler-gate .actions { margin-top: 24px; }
+.spoiler-gate button { text-align: left; cursor: pointer; }
+.spoiler-link { display: inline-block; border: 1px solid #685e73; border-radius: 8px; background: #302b38; color: #d4c7e1; padding: 9px 14px; font-size: 13px; }
+.spoiler-close { border: 1px solid #5a705d; border-radius: 8px; background: #25342b; padding: 7px 12px; cursor: pointer; }
+.spoiler-close:hover { background: #344637; }
+@media (max-width: 720px) { .spoiler-gate { margin: 25px 22px; padding: 24px; } }
