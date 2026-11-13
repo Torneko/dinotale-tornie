@@ -120,7 +120,7 @@
   "renewableEnemyScoreSuppressed": true,
   "storyHardElementalPrerequisite": false,
   "personalProfileInstalled": false,
-  "privateRevision": "0355-finishes1",
+  "privateRevision": "0355-candy1",
   "bossCheckpointOrdinaryPlacementReplay": true,
   "bossCheckpointChainedRetryReplay": true,
   "bossInitialRaw52CacheVerified": true,
@@ -131,5 +131,8 @@
   "validationScope": "Source capability contract; actual build and gameplay require their own evidence.",
   "bonusThumbnailImportAndPreview": true,
   "bonusSceneImagesDelivered": false,
-  "progressionRulesUnchanged": true
+  "progressionRulesUnchanged": true,
+  "bossCandyControlRecoveryFixed": true,
+  "candyGoldenPlatformsRemoved": true,
+  "candyNaturalReplayPending": true
 }

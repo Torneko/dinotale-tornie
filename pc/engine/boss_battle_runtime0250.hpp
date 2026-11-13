@@ -128,6 +128,27 @@ inline boss_tree_hybrid0260::Frame hybrid_tree_frame(){
 // MemberObserver. ADD40 returns AF5F8, which calls AF580; confusing those
 // addresses loses a live Inviso witness after its companion is defeated.
 inline constexpr uint32_t member_resource_constructor(const witnesses::Spec& cfg){return cfg.kind==0x4599?0x806AF5F8:cfg.init;}
+// Read-only live455A witness. Its public resource uses wrapper+10, not64E18.
+// A native segment count of zero can precede the actual completion callback.
+inline bool candy_live_zero_controls(uint8_t* rdram,unsigned n,const char** why=nullptr){
+ auto reject=[&](const char* reason){if(why)*why=reason;return false;};if(why)*why="ready";
+ const auto& s=session.snapshot();const auto& v=variants::snapshot();
+ if(!rdram||n>=session.current().count||n>=4||s.index>=10||physical_room!=rooms::source_for_encounter(s.index)||session.current().members[n].kind!=0x455A||(s.defeated&(1u<<n)))return reject("scope_or_defeated");
+ const auto& birth=v.members[n];const auto root=bound[n];const auto& observer=candies[n];const auto& proof=observer.snapshot();const auto& a=proof.actors[0];
+ if(!root||birth.actor!=root||!birth.birth||birth.receipt_sent||birth.retire_queued||observer_epochs[n]!=s.retry_epoch||observer.bound_actor()!=root)return reject("binding_or_epoch");
+ if(!proof.enabled||proof.invalidated||proof.family!=witnesses::Family::candy||proof.source_room!=logical_room||proof.run_token!=s.token||proof.expected_actors!=1||proof.registered_actors!=1||proof.expected_hits!=12||session.current().members[n].hits!=12)return reject("observer_scope");
+ if(!a.initialized||!a.active_seen||a.disposed||a.completion_returned||a.actor!=root||a.initial_counter!=12||a.counter<0||a.counter>12||a.causal_hits>12||unsigned(a.counter)+a.causal_hits!=12)return reject("native_activity");
+ if(!native::actor(rdram,root,0x455A)||native::byte(rdram,root+0x17D)!=2||native::byte(rdram,root+0x18)!=1||!native::range(a.private_data,0x24)||native::word(rdram,root+0x1F4)!=a.private_data)return reject("root_identity");
+ if(native::word(rdram,a.private_data)!=a.head||!native::actor(rdram,a.head,0x454F)||native::word(rdram,a.head+0x180)!=root||!native::range(a.head_private,0x88)||native::word(rdram,a.head+0x1F4)!=a.head_private||native::word(rdram,a.head_private+0x84)!=unsigned(a.counter))return reject("head_identity_or_counter");
+ const auto resource=native::word(rdram,root+0x168),overlay=overlays[167];
+ if(!native::range(resource,0x48)||!native::range(overlay,0x3000)||MEM_HU(0x3C,native::base(resource))!=0x455A||native::word(rdram,resource+0x40)!=overlay||native::word(rdram,resource+0x44)!=overlay+0x10)return reject("resource_wrapper");
+ return true;
+}
+inline bool witnessed_zero_controls(uint8_t*,uint32_t);
+inline void trace_missing_controls(uint8_t* rdram){
+ const auto& s=session.snapshot();fprintf(stderr,"[BossControlsBaseline] room=%u logical=%u encounter=%u epoch=%u variantEpoch=%u player=%08X flags=%u,%u defeated=%u vi=%u witness=%u\n",physical_room,logical_room,s.index,s.retry_epoch,variant_epoch,s.player,native::byte(rdram,0x800F7EA5),native::byte(rdram,0x800F7EA6),unsigned(s.defeated),current_vi,unsigned(witnessed_zero_controls(rdram,s.player)));
+ for(unsigned n=0;n<session.current().count&&n<4;++n)if(session.current().members[n].kind==0x455A){const char* why=nullptr;const bool live=candy_live_zero_controls(rdram,n,&why);const auto& p=candies[n].snapshot();const auto& a=p.actors[0];fprintf(stderr,"[BossControlsCandy] member=%u root=%08X birth=%llu observerEpoch=%u enabled=%u invalid=%u active=%u count=%d hits=%u complete=%u disposed=%u live=%u why=%s\n",n,bound[n],static_cast<unsigned long long>(variants::snapshot().members[n].birth),observer_epochs[n],unsigned(p.enabled),unsigned(p.invalidated),unsigned(a.active_seen),a.counter,a.causal_hits,unsigned(a.completion_returned),unsigned(a.disposed),unsigned(live),why?why:"unknown");}
+}
 inline bool witnessed_zero_controls(uint8_t* rdram,uint32_t player){
  const auto& s=session.snapshot();const auto& v=variants::snapshot();
  if(!rdram||!active()||s.phase!=core::Phase::Fighting||player!=s.player||native::byte(rdram,0x800F7EA5)||native::byte(rdram,0x800F7EA6)||!witnesses::active_player(rdram,player)||native::word(rdram,0x800F8828)!=player||native::byte(rdram,player+0x17D)!=2||native::byte(rdram,player+0x165)||!native::byte(rdram,player+0x18)||native::byte(rdram,player+0x18)==0xFF)return false;
@@ -135,7 +156,7 @@ inline bool witnessed_zero_controls(uint8_t* rdram,uint32_t player){
  if(!native::range(p,0x12F0)||native::word(rdram,p+0x12EC)||!v.enabled||v.invalidated||v.encounter!=s.index||v.room!=logical_room||core::room(session.current().family)!=logical_room||variant_epoch!=s.retry_epoch)return false;
  if(blargg_owned())for(unsigned n=0;n<2;++n)if(blargg_active_member(rdram,n))return true;
  for(unsigned n=0;n<session.current().count&&n<4;++n){
-  const auto kind=session.current().members[n].kind;const auto family=witnesses::family_for_kind(kind);if(!family||(s.defeated&(1u<<n)))continue;
+  const auto kind=session.current().members[n].kind;if(kind==0x455A){if(candy_live_zero_controls(rdram,n))return true;continue;}const auto family=witnesses::family_for_kind(kind);if(!family||(s.defeated&(1u<<n)))continue;
   const auto& cfg=witnesses::spec(*family);const auto& birth=v.members[n];const auto& observer=observers[n];const auto& proof=observer.snapshot();const auto& a=proof.actors[0];const auto root=bound[n];
   // Companions use their configured encounter source (Genie in Candy,
   // Inviso in Lips), while keeping their own native overlay and resource.
@@ -456,7 +477,7 @@ template<class Dispatch> inline void frame(uint8_t* rdram,recomp_context* c,unsi
  const auto before_unlink=placement_guard.snapshot();std::array<uint64_t,4> births{};for(unsigned n=0;n<session.current().count;++n)births[n]=variants::snapshot().members[n].birth;
  if(placement_guard.pending()&&!placement_guard.post_675(rdram,c,{physical_room,session.snapshot().index,vi,session.snapshot().player,session.snapshot().phase,true},births,dispatch)){fail("boss_placement_post_fence_rejected");return;}
  for(unsigned n=0;n<session.current().count;++n){const auto& b=placement_guard.snapshot()[n];if(!before_unlink[n].applied&&b.applied)fprintf(stderr,"[BossPlacement] consumed fight=%u member=%u actor=%08X record=%08X packed=%08X vi=%u\n",session.snapshot().index+1,n,b.actor,b.record,b.packed,vi);}
- if(restore_pending){if(!flags_ready){fail("missing_active_controls_baseline");return;}const auto saved=*c;c->r29=ADD32(saved.r29,-0xC0);c->r4=native::base(session.snapshot().player);func_80040C0C(rdram,c);*c=saved;MEM_B(0,int32_t(0x800F7EA5))=flags5;MEM_B(0,int32_t(0x800F7EA6))=flags6;restore_pending=false;}
+ if(restore_pending){if(!flags_ready){trace_missing_controls(rdram);fail("missing_active_controls_baseline");return;}const auto saved=*c;c->r29=ADD32(saved.r29,-0xC0);c->r4=native::base(session.snapshot().player);func_80040C0C(rdram,c);*c=saved;MEM_B(0,int32_t(0x800F7EA5))=flags5;MEM_B(0,int32_t(0x800F7EA6))=flags6;restore_pending=false;}
  if(session.snapshot().phase==core::Phase::Victory&&!exit_pot&&!spawn_exit(rdram,c))fail("native_exit_pot_failed");
 }
 // Diagnostic controller only: the native candy actors and defeat observers

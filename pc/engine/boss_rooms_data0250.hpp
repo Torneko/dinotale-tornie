@@ -703,7 +703,7 @@ inline void configure(const boss_battle0250::Plan& plan){
   // Native floor, water and entry remain fixed. Monsters only remove
   // selected existing bricks; Lips uses immutable geometry aliases. Other land arenas may add two
   // verified464F platforms; the final RedCandy has none. Fish shift only its middle/right islands.
-  if(e.terrain&&e.family!=boss_battle0250::Family::RedCandy&&logical!=97&&logical!=165&&logical!=151&&logical!=19){float y=logical==163?568.0f:400.0f;float left=e.terrain==1?328.0f:264.0f,right=e.terrain==1?456.0f:520.0f;if(logical==164)left=e.terrain==1?192.0f:160.0f;
+  if(e.terrain&&e.family!=boss_battle0250::Family::RedCandy&&logical!=162&&logical!=97&&logical!=165&&logical!=151&&logical!=19){float y=logical==163?568.0f:400.0f;float left=e.terrain==1?328.0f:264.0f,right=e.terrain==1?456.0f:520.0f;if(logical==164)left=e.terrain==1?192.0f:160.0f;
    add(objects,0x464F,100,left,y);add(objects,0x464F,101,right,y);
   }
   // Checkpoint No1 is a genuine placement in the opening arena only.
