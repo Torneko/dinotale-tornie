@@ -75,7 +75,8 @@ for path in sorted(WEB.glob('*.html')):
     assert page.lang in ('fr', 'en')
     assert '<meta name="viewport"' in source
     assert all(ref in page.ids for ref in page.controls + page.labels), path
-    assert '0.35.5' not in source, 'Unreleased candidate must not be advertised'
+    assert '0.35.5-beta.1' in source, 'Current prerelease must be identified'
+    assert not re.search(r'Canti|OneDrive|[CD]:[\\/]', source, re.I), 'Personal installation details must stay out of the public site'
     pages[path.name] = page
     for ref in page.refs:
         url = urlsplit(ref)
@@ -96,13 +97,13 @@ assert pages['guide.html'].inert_sections == pages['guide-en.html'].inert_sectio
 assert len(pages['guide.html'].inert_sections) == 7
 
 # A fragment never finds the detailed sections in the initial active document.
-spoiler_terms = re.compile(r'\b(hybrid\w*|turquoise\w*|seize|sixteen|eighteen|elemental\w*|\u00e9l\u00e9mentair\w*)\b|gold and silver|or et argent|Boss Battle|Story difficile|Hard Story', re.I)
+spoiler_terms = re.compile(r'\b(hybrid\w*|turquoise\w*|seize|sixteen|eighteen|elemental\w*|\u00e9l\u00e9mentair\w*)\b|gold and silver|or et argent|Boss Battle|Story difficile|Hard Story|dix-huit|\b(?:Feu|Eau|Fire|Water|2-2|3-4)\b', re.I)
 for name in ('index.html', 'index-en.html'):
     source = (WEB / name).read_text(encoding='utf-8')
     assert not spoiler_terms.search(source), (name, spoiler_terms.search(source).group() if spoiler_terms.search(source) else '')
     assert not pages[name].inert_sections
     assert all(image['src'] == 'assets/egg-book.svg' and not inert for image, inert in pages[name].images)
-    for required in ('DinoTale.exe', 'Jouer.sh', 'Atelier.sh', '.z64', '.v64', '.n64', '0.34.0-beta.1'):
+    for required in ('DinoTale.exe', 'Jouer.sh', 'Atelier.sh', '.z64', '.v64', '.n64', '0.35.5-beta.1'):
         assert required in source, (name, required)
     assert 'USA' in source
     assert ('3 %' if name == 'index.html' else '3%') in source
@@ -117,10 +118,12 @@ for name in ('guide.html', 'guide-en.html'):
     assert all(inert and image.get('loading') == 'lazy' for image, inert in page.images)
     source = (WEB / name).read_text(encoding='utf-8')
     assert '<noscript>' in source and '<template id="spoiler-content">' in source
-    assert '0.34.0-beta.1' in source and '0.35.3' in source
+    assert '0.35.5-beta.1' in source and '0.34.0-beta.1' in source
+    assert ('seize couleurs historiques' if name == 'guide.html' else 'original sixteen') in source
+    assert ('douze couleurs' if name == 'guide.html' else 'twelve egg colours') in source
 
 release = (WEB / 'assets/release.js').read_bytes()
-assert hashlib.sha256(release.replace(b'\r\n', b'\n')).hexdigest() == '18b695fa720252ac97da751ab940bf0620a728e7ff2cbdddc733a7643716cb0f', 'Published version/download links changed unexpectedly'
+assert b'0.35.5-beta.1' in release and b'0.34.0-beta.1' not in release, 'Release metadata must target current prerelease'
 css = (WEB / 'assets/guide.css').read_text(encoding='utf-8')
 assert '[hidden] { display: none !important; }' in css
 assert ':focus-visible' in css and 'prefers-reduced-motion' in css
@@ -131,7 +134,8 @@ node = shutil.which('node')
 assert node, 'Node.js is required for the DOM-event regression checks'
 subprocess.run([node, '--check', str(WEB / 'assets/guide.js')], check=True, timeout=20)
 subprocess.run([node, str(ROOT / 'scripts/check-spoilers.cjs')], check=True, timeout=20)
+subprocess.run([node, str(ROOT / 'scripts/check-release.cjs')], check=True, timeout=20)
 print(json.dumps({'status': 'PASS', 'pages': 4, 'public_sections_per_language': 8,
                   'inert_spoiler_sections_per_language': 7,
-                  'published_release': '0.34.0-beta.1', 'local_links': 'PASS',
+                  'published_release': '0.35.5-beta.1', 'local_links': 'PASS',
                   'semantic_html': 'PASS', 'browser_gpu_used': False}))

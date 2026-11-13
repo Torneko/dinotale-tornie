@@ -1,76 +1,76 @@
-# Building DinoTale Tornie 0.34.0-beta.1
+# Building DinoTale Tornie 0.35.5-beta.1
 
-The public tree contains no ROM, complete generated game C, save data or private build caches. Build tools operate on a locally selected original USA ROM. The source archive and tagged tree accompany both binary downloads. Compiler and SDK changes can produce different executable bytes.
+Use a dedicated development checkout. The public tree contains no original ROM, prepared game image, complete generated game functions, generated RSP source, personal progression or private cache. The source archive accompanies both testing downloads; its dependency manifest records all pinned libraries. Compiler and SDK changes can produce different executable bytes.
 
 ## Checkout and dependencies
 
 ```sh
-git clone --recurse-submodules --branch v0.34.0-beta.1 https://github.com/Torneko/dinotale-tornie.git
+git clone --recurse-submodules --branch v0.35.5-beta.1 https://github.com/Torneko/dinotale-tornie.git
 cd dinotale-tornie
 ```
 
-For a source ZIP, obtain the pinned submodules listed in `upstream.json` and `.gitmodules` at the recorded commits. GitHub's automatic source ZIP does not populate submodules either. The retained libraries are patched by `pc/dinotale/lib-patches` through CMake. Use a dedicated checkout, not a personal game folder.
+GitHub’s automatic ZIP and the curated source ZIP do not populate library submodules. From a source ZIP, obtain the Git checkouts at the exact commits recorded in `.gitmodules`, `upstream.json` and the included dependency-pin manifest; initialize their nested submodules. A recursive tagged Git checkout is the simplest build route. CMake applies the retained `pc/dinotale/lib-patches` series, so use disposable library checkouts rather than an installed game folder.
 
-Native prerequisites are described in [upstream BUILDING](pc/dinotale/BUILDING.md). The packaged Windows game is the frozen solo0.33.0 engine, built with Clang20 and the VisualStudio C++ SDK. The packaged Linux engine was built with Clang15, CMake3.22, glibc2.35 and SDL2.30.3 on Ubuntu22.04.5. Linux Mint22.3 is the target; its gameplay remains unvalidated. Linux uses the host's Vulkan/graphics drivers and system desktop libraries, not bundled driver copies.
+Windows native builds use a Visual Studio developer environment, Clang20 and Ninja. Linux binaries were compiled on Ubuntu22.04 with Clang15, glibc2.35 and SDL2.30.3. Desktop build prerequisites include GTK3, Freetype, X11 and Vulkan development packages; pinned RT64 submodules contain DXC. Linux Mint22.3 is the gameplay target, with human testing pending. See [upstream prerequisites](pc/dinotale/BUILDING.md).
 
-## Prepare local game functions
+The Workshop uses .NET SDK9.0.300 and a self-contained .NET/ASP.NET9.0.5 runtime. Recipient machines do not need an SDK or .NET installation. Native graphics drivers and desktop libraries remain system dependencies.
 
-Build pinned N64Recomp from `pc/dinotale/lib/N64ModernRuntime/N64Recomp`, then:
+## Generate local tools and game functions
 
-```sh
-python pc/scripts/prepare-content.py --rom /path/to/original-USA-ROM.z64 --recompiler /path/to/N64Recomp
-```
-
-On Windows the recompiler is `N64Recomp.exe`. This normalizes .z64/.v64/.n64, verifies the original, applies the BPS delta, runs the recompiler and the baseline fixups, verifies219 base files, then applies `pc/recompile/native-hooks-0340.patch`. All219 final files must match `generated-0340-sha256.json` after newline normalization. The original ROM is read only. Output is the new `pc/build/special-port` directory; an existing output is rejected.
-
-The audio microcode is also generated locally from the prepared content: it is byte-identical to the original microcode, and the public CMake configuration uses that existing local content path. No extra original ROM copy is needed in the source tree.
-
-The patch contains the later native hook changes rather than full generated game sources. `pc/scripts/apply-native-hooks0340.py` verifies the base before applying anything and verifies the final manifest. The release preparation compared this output exactly against the Windows0330/Linux0340 engine input. It did not run a game or claim a second native build.
-
-## Native runtime and music worker
-
-From a Clang/VisualStudio developer shell on Windows:
+Build the pinned N64Recomp tools first:
 
 ```sh
-python pc/scripts/build-current0340.py --platform windows --jobs 2
+cmake -S pc/dinotale/lib/N64ModernRuntime/N64Recomp -B pc/build/recompiler-tools -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build pc/build/recompiler-tools --target N64RecompCLI RSPRecomp --parallel 2
 ```
 
-Linux, with Clang15 and suitable SDL2/Vulkan development packages:
+On Windows use the Clang/Visual Studio developer shell and the resulting `.exe` tools. Point the preparation command at an original USA ROM in any supported byte order:
 
 ```sh
-python3 pc/scripts/build-current0340.py --platform linux --jobs 2
+python3 pc/scripts/prepare-content0355.py --rom /path/to/original-USA-ROM.z64 --recompiler pc/build/recompiler-tools/N64Recomp
 ```
 
-Use `--sdl2-dir /path/to/SDL2/cmake` when SDL2 is not found automatically. The helper passes the release's prepared source path and native hook definitions; the co-op definition is required for existing compiled ABI hooks and does not imply that co-op or Boss Battle are finished. The `DinoTale` target also builds the separate CPU-only `MusicRender0310` executable. Both belong in a distribution.
+This invokes the original preparation path, verifies the BPS reconstruction and 219-file baseline, applies the verified 0.34.0 hooks and then the incremental owned 0.35.5 hooks. All final generated files must match `pc/recompile/generated-0355-sha256.json` after newline normalization. It rejects an existing output directory and preserves the selected ROM. The original `.z64/.v64/.n64` is neither copied into the public source tree nor changed.
 
-The worker declaration was corrected for Linux Clang15. `pc/platform-variants/windows0330/menu_music_native0310.cpp` retains the pre-Linux Windows worker source for provenance. Recompiled RSP switch-case ordering also changes text-based renderer identity between toolchains; native PCM/WAV output matched Windows byte for byte. There is no promise of identical executable bytes or renderer-cache identity after a source rebuild.
+## Native engine and standalone audio worker
 
-## Workshop, importer and Windows launcher
-
-Install .NET SDK9. The shipped Workshop apphosts are self-contained and require no separately installed .NET at runtime.
+Linux:
 
 ```sh
-dotnet publish pc/workshop/Workshop/Workshop.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o pc/build/workshop-0.21.0
-dotnet publish pc/workshop/WorkshopLinux/WorkshopLinux.csproj -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o pc/build/workshop-linux
+python3 pc/scripts/build-current0355.py --platform linux --rsp-recompiler pc/build/recompiler-tools/RSPRecomp --jobs 2
 ```
 
-The directory `workshop-0.21.0` is a retained engine lookup path; it does not indicate an older editor. The Windows package's root launcher and its exact C++ source are in `pc/workshop/PortableLauncherNative0340`. In a VisualStudio C++ developer shell, use:
+Windows, from the developer shell:
 
 ```sh
-cmake -S pc/workshop/PortableLauncherNative0340 -B pc/build/portable-launcher0340 -A x64
-cmake --build pc/build/portable-launcher0340 --config Release
+python pc/scripts/build-current0355.py --platform windows --rsp-recompiler pc/build/recompiler-tools/RSPRecomp.exe --jobs 2
 ```
 
-The packaging script also records the original native compile command. Its package icon is a standard resource from the retained upstream icon; SDK/resource metadata may vary after rebuilding. The editor bootstrap verifies the executable hash and BPS manifest, imports locally and preserves an existing unrelated save. Linux entry points are `Jouer.sh` and `Atelier.sh`.
+Add `--sdl2-dir /path/to/SDL2/cmake` when required. The helper uses only the locally prepared, hash-verified content image to generate audio microcode through `prepare-audio0355.py`. It retains provenance and refuses to overwrite an unrelated existing RSP file. The CMake integration then compiles that local RSP source directly into the game and the CPU-only `MusicRender0310` worker; it does not require a second original ROM at the upstream root. `WORKSHOP_NATIVE_COOP` is an existing native ABI build definition, not a statement that cooperative play is finished.
 
-Package scripts are retained under `pc/scripts`; only reviewed explicit inputs should be used. Each rebuilt engine requires a new `content-patch.json` bound to its executable SHA256, even when `content.bps` is unchanged. Keep all dependency licenses, assets, the music worker, fresh seed and package manifests. Do not ship the original ROM, prepared content image or a personal profile.
+RSPRecomp switch-case ordering can vary between toolchains. A newly generated audio source must be qualified for its own renderer identity; the release does not promise identical generated RSP text or executable bytes on every compiler. Do not reuse a prior identity receipt to certify a different source.
 
-## Verification scope and guide
+The runtime output is `pc/build/native-special`. A rebuilt executable needs a `content-patch.json` whose `engineSha256` matches its actual SHA256 before using the local Workshop importer. Keep `sourceSha256`, `targetSha256`, sizes and BPS hash unchanged. Review this binding in a dedicated development checkout; a source build must not overwrite another player’s package or progression.
 
-The release's public verification summary is in `docs/VALIDATION-0.34.0-beta.1.json`. Native CPU checks and real Workshop APIs passed. Windows solo tests were performed on the frozen engine, but new StoryHard/editor long-play checks remain pending. Linux WSL software graphics stalled during the intro: no playable level was reached, and Mint hardware validation remains pending. Co-op and Boss Battle are incomplete and deferred.
+## Workshop and portable launcher
+
+```sh
+dotnet publish pc/workshop/Workshop/Workshop.csproj -c Release -r win-x64 --self-contained true -p:RuntimeFrameworkVersion=9.0.5 -p:Version=0.35.5 -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o pc/build/workshop-0.21.0
+dotnet publish pc/workshop/WorkshopLinux/WorkshopLinux.csproj -c Release -r linux-x64 --self-contained true -p:RuntimeFrameworkVersion=9.0.5 -p:Version=0.35.5 -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o pc/build/workshop-linux
+```
+
+`workshop-0.21.0` is the retained Windows lookup path and does not indicate an older editor. The portable Windows bootstrap source remains `pc/workshop/PortableLauncherNative0340`, with the original build recipe in the [0.34.0 build notes](docs/BUILDING-0.34.0-beta.1.md). The bootstrap was reused unchanged; engine and Workshop components were updated. Linux entry points are `Jouer.sh` and `Atelier.sh`.
+
+Packaging scripts under `pc/scripts` describe the reviewed inputs and checks; release exports additionally require the matching redistributable libraries, licenses, importer bindings and a factory-empty seed. Preserve the content delta, notices, assets, audio worker and manifests. Never include the original/prepared game image, personal profile, test-created unlocks, local caches or a build-transfer key.
+
+## Verification and release provenance
+
+The release verification and source manifests distinguish final tagged sources from the exact native compile commit. Documentation and website changes can follow a binary build; canonical production source inputs must remain identical. The source archive exports raw Git blobs, not history or private encrypted build-input refs. Windows line-ending conversion is not a valid substitute for raw Git-object hashes.
+
+Native CPU checks and real headless Workshop API checks do not certify complete gameplay. No fresh Linux ROM-backed music render is claimed by the ROM-free remote workflow: its worker source identity is bound to previously qualified Windows/Linux renders. New LinuxMint gameplay, rendering, and grouped mode tests remain pending. Co-op and Boss Battle remain unfinished testing features.
 
 ```sh
 python scripts/check-site.py
 ```
 
-The static FR/EN guide is in `website`. GitHub Pages deploys `main` through `.github/workflows/website.yml`. No ROM is needed or uploaded by guide CI.
+This validates the bilingual website, its explicit spoiler gate and download links. The static `website` folder is deployed through GitHub Pages. No ROM is needed for guide CI. Historical release instructions remain in the tagged earlier versions and [archived 0.34.0 notes](docs/BUILDING-0.34.0-beta.1.md).

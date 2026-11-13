@@ -1,0 +1,69 @@
+{
+  "version": "0.35.5-beta.1",
+  "engineVersion": "0.35.5",
+  "candidateOnly": true,
+  "stableGameplayCertified": false,
+  "binaryCompileSourceCommit": "0b19505d2a9c45ef14b4c9f0939cb0440dbe475d",
+  "linuxWorkflowRun": "https://github.com/Torneko/dinotale-tornie/actions/runs/43364913673",
+  "windows": {
+    "engineSha256": "08ffb814ce95703f248ec50000f7ad9b6c3023ff572c74150a2633ff650c5d75",
+    "workerSha256": "2b7498e161eaa5638321c07e36a433477335f202335f7e23f48efedffe8e55e6",
+    "workshopSha256": "6d9717aa97e6c87e69bf0e23901b7520d0a3decd79ac7bf8ca7c90b4cc5faa16",
+    "archiveSha256": "fade74812ee27cee6e72e09a8b002def6db6072ddb50cbdb57d455b47623c938",
+    "packageChecks": 156,
+    "privacyRejections": 7,
+    "bonusHelperChecks": 48,
+    "importFormats": [
+      "z64",
+      "v64",
+      "n64"
+    ],
+    "nativeBossBootstrapAndRetryCpuChecks": 2996,
+    "nativeEvidenceIsSyntheticHostFixture": true,
+    "bootstrapProofSha256": "387eeb01a8c8564be0955ae641ac492215799e4e3362fea72073448023df0fed",
+    "newManualGameplayCertified": false
+  },
+  "linux": {
+    "engineSha256": "8001bebfa421b06aaff497afd521c037ca7df883ef08967644133b13b35c8afc",
+    "workerSha256": "2c4622fa2bb7d6cdbbfc74d00cb2847314f6f590b82228daeb35818125b1f76a",
+    "workshopSha256": "4e49d951d92f90385613d3f9c47861eebc2afd3963694899bf6c54f5181a5a18",
+    "nativeBuildVerified": true,
+    "posixChecks": 139,
+    "bonusLauncherChecks": 80,
+    "workshopApiChecks": 88,
+    "workshopSelfContained": true,
+    "runtimeVersion": "9.0.5",
+    "sdkVersion": "9.0.300",
+    "archiveFileCount": 80,
+    "inputCandidateSha256": "899f0daa683f3ed2bfedaa1e73dc19d757e7458d5975f9635d8f50a0bd045599",
+    "candidateArchiveAuditPassed": true,
+    "sourceGitBlobManifestSha256": "554cf828943f6254882eee3aa7da8d68abab20438a56e13aabac6451533b3562",
+    "retryHeaderSha256": "fa3b70ff4bb8e1e3f0baea6beb453ad48203744f15d971df892e64bb903e261f",
+    "workerSourceIdentity": "e92953f9f664ca2b79e44f7709fe04185502638627fe824d724822dcd121da1c",
+    "freshRomBackedAudioRenderVerified": false,
+    "gameGpuOrAudioDeviceExecuted": false,
+    "physicalLinuxMint22_3GameplayVerified": false,
+    "earlierUserLinuxFeedbackVersion": "0.34.0-beta.1",
+    "archiveSha256": "b28d9b7c3a456e74b3890429ce7db16144876f77a6a36124f3cc9c9823afa2f3",
+    "archiveBytes": 62084259,
+    "publicMetadataOnlyRepackVerified": true,
+    "publicRepackProvenanceSha256": "72265b2f09b25d16106ad8ce386ca1ba884a7143e585864f299356e6841d9461"
+  },
+  "distribution": {
+    "romIncluded": false,
+    "preparedContentIncluded": false,
+    "personalProgressIncluded": false,
+    "freshSave": true,
+    "initialCurrency": 0,
+    "initialVolumePercent": 3,
+    "testUnlocksForced": false,
+    "coopAndBossBattleIncomplete": true,
+    "originalRomRequired": true
+  },
+  "limits": [
+    "Native CPU fixtures, build and HTTP checks do not replace a natural playthrough.",
+    "Human gameplay on Linux Mint 22.3 remains pending.",
+    "Co-op and Boss Battle remain unfinished testing features.",
+    "The release audio worker has source-identity qualification; no fresh Linux ROM-backed render was performed."
+  ]
+}
