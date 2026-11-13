@@ -1,4 +1,4 @@
-name: Private Linux 0.35.5 candidate
+name: Private Linux 0.35.5 candidate with0358 finishes
 on:
   workflow_dispatch:
     inputs:
@@ -67,6 +67,17 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.300
+      - name: Verify portable0358 thumbnails and bubble regressions before native compilation
+        shell: bash
+        run: python3 pc/scripts/ci/verify-finishes0359.py --run
+      - name: Upload standalone thumbnail preflight proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux0359-fast-preflight-${{ inputs.source_commit }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: pc/build/linux-finishes0359/fast-*/verification.json
       - name: Publish actual0355 Linux Workshop
         shell: bash
         run: python3 pc/scripts/publish-workshop-linux-ci0355.py --publish-go

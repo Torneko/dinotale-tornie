@@ -23,6 +23,7 @@ extern "C" int workshop_battle_failed();
 #include "hybrid_mode.hpp"
 #include "game_modes0320.hpp"
 #include "bonus_game0352.hpp"
+#include "bonus_thumbnail0358.hpp"
 #include "story_hybrid0320.hpp"
 #include "story_rights0320.hpp"
 #include "known_yoshis_runtime0355.hpp"
@@ -171,6 +172,54 @@ unsigned snapshot_frame=~0u;
 Element *book=nullptr,*main_page=nullptr,*detail_page=nullptr;
 
 Label *detail_title=nullptr,*detail_body=nullptr,*footer=nullptr;
+Image* bonus_thumbnail_image0358=nullptr;
+workshop::bonus_thumbnail0358::Cache bonus_thumbnail_cache0358;
+class BonusThumbnailImage0358:public Image {
+public:
+    using Image::Image;
+    ~BonusThumbnailImage0358() override {if(bonus_thumbnail_image0358==this)bonus_thumbnail_image0358=nullptr;}
+};
+void hide_bonus_thumbnail0358(){
+    if(bonus_thumbnail_image0358){bonus_thumbnail_image0358->display_hide();bonus_thumbnail_image0358->set_src("");}
+}
+bool bounded_bonus_png0358(const workshop::bonus_thumbnail0358::ReadResult& image){
+    using namespace workshop::bonus_thumbnail0358;
+    if(image.status!=Status::Ready||!dimensions(image.width,image.height)||image.png.size()<57||image.png.size()>max_bytes)return false;
+    const auto& png=image.png;const unsigned color=uint8_t(png[25]);if(color!=2&&color!=6)return false;
+    std::vector<char> compressed;
+    for(size_t p=8;p<png.size();){
+        if(png.size()-p<12)return false;const uint32_t size=workshop::bonus_thumbnail0358::u32(png,p);if(size>png.size()-p-12)return false;
+        if(png[p+4]=='I'&&png[p+5]=='D'&&png[p+6]=='A'&&png[p+7]=='T')compressed.insert(compressed.end(),png.begin()+p+8,png.begin()+p+8+size);
+        p+=size_t(size)+12;
+    }
+    if(compressed.size()<6||compressed.size()>max_bytes)return false;
+    const unsigned cmf=uint8_t(compressed[0]),flg=uint8_t(compressed[1]);
+    if((cmf&15)!=8||(cmf>>4)>7||((cmf<<8)|flg)%31||(flg&32))return false;
+    const size_t stride=size_t(image.width)*(color==2?3:4)+1,expected=stride*image.height;
+    std::vector<char> rows(expected);
+    // Fixed-output inflate rejects expansion beyond the exact scanline budget
+    // before stb's PNG loader, whose general malloc path may otherwise grow.
+    if(stbi_zlib_decode_buffer(rows.data(),int(rows.size()),compressed.data(),int(compressed.size()))!=int(expected))return false;
+    for(unsigned y=0;y<image.height;++y)if(uint8_t(rows[size_t(y)*stride])>4)return false;
+    uint32_t a=1,b=0;for(unsigned char v:rows){a=(a+v)%65521u;b=(b+a)%65521u;}
+    return((b<<16)|a)==workshop::bonus_thumbnail0358::u32(compressed,compressed.size()-4);
+}
+workshop::bonus_thumbnail0358::View read_bonus_thumbnail0358(unsigned bonus,bool unlocked){
+    try{
+        const auto image=workshop::bonus_thumbnail0358::read(pc_root,bonus,unlocked);
+        return bonus_thumbnail_cache0358.consider(bonus,image,[](const std::string& key,const workshop::bonus_thumbnail0358::ReadResult& input){
+            if(!bounded_bonus_png0358(input))return false;
+            int width=0,height=0,channels=0;
+            auto* pixels=stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(input.png.data()),int(input.png.size()),&width,&height,&channels,4);
+            if(!pixels)return false;
+            if(width!=int(input.width)||height!=int(input.height)){stbi_image_free(pixels);return false;}
+            std::vector<char> rgba;
+            try{rgba.assign(reinterpret_cast<const char*>(pixels),reinterpret_cast<const char*>(pixels)+size_t(width)*size_t(height)*4);}catch(...){stbi_image_free(pixels);throw;}
+            stbi_image_free(pixels);
+            recompui::queue_image_from_bytes_rgba32(key,rgba,unsigned(width),unsigned(height));return true;
+        });
+    }catch(const std::exception&){return{workshop::bonus_thumbnail0358::Status::Invalid,{}};}
+}
 
 std::array<Element*,4> actions{};
 
@@ -408,6 +457,7 @@ void home(){
 
     if(auto focused=menu_context.get_focused_element())focused->blur();
 
+    hide_bonus_thumbnail0358();
     detail_open=false;detail_page->display_hide();main_page->display_show();
 
     refresh_book_yoshis0355();
@@ -427,6 +477,7 @@ void panel(const std::string& title,const std::string& body){
 
     detail_open=true;main_page->display_hide();detail_page->display_show();
 
+    hide_bonus_thumbnail0358();
     detail_title->set_text(title);detail_body->set_text(body);
 
     for(auto button:actions)button->display_hide();
@@ -1208,7 +1259,13 @@ void bonus_levels0352(unsigned page){
         text+=tr("\n\nAprès fermeture du jeu, Reprendre revient à la première salle, avec le même ordre et les salles déjà validées. Pendant la partie, les checkpoints conservent la reprise native.","\n\nAfter closing the game, Resume returns to the first room, keeping the same order and cleared rooms. During play, checkpoints retain native continuation.");
     if(!state.access.classic_readable||!state.access.hybrid_readable)
         text+=tr("\nUne progression n'a pas pu être lue ; elle est conservée.","\nSome progress could not be read; it has been preserved.");
+    const auto thumbnail=read_bonus_thumbnail0358(page+1,unlocked);
+    using ThumbnailStatus=workshop::bonus_thumbnail0358::Status;
+    if(thumbnail.status==ThumbnailStatus::Missing)text+=tr("\n\nAjoute une capture de ce Bonus dans l’onglet Vignettes Bonus de l’Atelier.","\n\nAdd a screenshot for this Bonus in the Workshop’s Bonus thumbnails tab.");
+    else if(thumbnail.status==ThumbnailStatus::Invalid)text+=tr("\n\nCette vignette ne peut pas être affichée. Son fichier est conservé ; une nouvelle capture peut être importée dans l’Atelier.","\n\nThis thumbnail cannot be displayed. Its file is preserved; another screenshot can be imported in the Workshop.");
+    else if(thumbnail.status==ThumbnailStatus::RestartRequired)text+=tr("\n\nNouvelle capture enregistrée : relance DinoTale pour l’afficher.","\n\nNew screenshot saved: restart DinoTale to display it.");
     panel(tr("Niveau bonus 7-","Bonus course 7-")+std::to_string(page+1),text);
+    if(thumbnail.status==ThumbnailStatus::Ready&&bonus_thumbnail_image0358){bonus_thumbnail_image0358->set_src(thumbnail.key);bonus_thumbnail_image0358->display_show();}
     const bool playable=state.full_route_available&&unlocked&&state.session.readable&&state.session.last_write_succeeded;
     if(playable){
         const auto& attempt=state.session.attempts[page];
@@ -1303,6 +1360,13 @@ void create(LauncherMenu* menu){
     detail_title=menu_context.create_element<Label>(detail_page,"",LabelStyle::Large);rect(detail_title,4,2,92,10);detail_title->set_font_size(35);detail_title->set_color(ink);detail_title->set_font_weight(800);
 
     auto body_scroll=menu_context.create_element<Element>(detail_page);rect(body_scroll,4,14,92,54);body_scroll->set_overflow_y(Overflow::Auto);
+
+    bonus_thumbnail_cache0358.new_context();
+    bonus_thumbnail_image0358=menu_context.create_element<BonusThumbnailImage0358>(body_scroll,"");
+    bonus_thumbnail_image0358->set_width(100,Unit::Percent);bonus_thumbnail_image0358->set_max_width(320);bonus_thumbnail_image0358->set_height_auto();
+    bonus_thumbnail_image0358->set_margin_left_auto();bonus_thumbnail_image0358->set_margin_right_auto();
+    bonus_thumbnail_image0358->set_margin_bottom(10);bonus_thumbnail_image0358->set_border_radius(10);
+    bonus_thumbnail_image0358->set_pointer_events(PointerEvents::None);bonus_thumbnail_image0358->display_hide();
 
     detail_body=menu_context.create_element<Label>(body_scroll,"",LabelStyle::Small);detail_body->set_width(100,Unit::Percent);detail_body->set_height_auto();detail_body->set_font_size(23);detail_body->set_line_height(29);detail_body->set_font_weight(400);detail_body->set_letter_spacing(0);detail_body->set_color(ink);
 

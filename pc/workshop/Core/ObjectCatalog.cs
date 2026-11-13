@@ -121,7 +121,7 @@ public static class ObjectCatalog {
 
         new(0x4536,"Pak E. Derm","Ennemis","Éléphant qui bloque le passage."),
 
-        new(0x45B6,"Piment","Fruits","Piment ; +2 de vie pour les nouveaux Yoshis dans les règles 9.2."),
+        new(0x45B6,"Piment","Fruits","Piment ; son effet sur la vie dépend du Yoshi choisi : soin ou perte de pétales."),
 
         new(0x45BC,"Melon caché","Fruits","Melon révélé par son déclencheur associé."),
 

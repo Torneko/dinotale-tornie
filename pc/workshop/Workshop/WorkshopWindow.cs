@@ -31,7 +31,7 @@ public sealed partial class WorkshopWindow : Form {
 
     readonly SpecialContentRunner specialRunner;
 
-    readonly Label status=new() {Dock=DockStyle.Bottom,Height=32,Padding=new(12,8,0,0),Text="Prototype PC • éditeur de placements du 1-1 • solo jouable"};
+    readonly Label status=new() {Dock=DockStyle.Bottom,Height=32,Padding=new(12,8,0,0),Text="Atelier • niveaux, salles et objets"};
 
     readonly ListBox levels=new() {Dock=DockStyle.Fill,DisplayMember="Name"};
 
@@ -86,7 +86,7 @@ public sealed partial class WorkshopWindow : Form {
 
         EditorVisuals.AssetRoot=Directory.Exists(Path.Combine(root,"assets/editor"))?Path.Combine(root,"assets/editor"):Path.Combine(root,"build/special-assets");
 
-        Text="DinoTale — Atelier 0.27.0";Width=1460;Height=920;MinimumSize=new(1160,740);KeyPreview=true;
+        Text="DinoTale — Atelier 0.35.5";Width=1460;Height=920;MinimumSize=new(1160,740);KeyPreview=true;
 
         Font=new("Segoe UI",10);BackColor=Color.FromArgb(246,244,232);ForeColor=Color.FromArgb(32,48,42);
 
@@ -94,7 +94,7 @@ public sealed partial class WorkshopWindow : Form {
 
         foreach(var list in new[]{levels,gameLevels}){list.DrawMode=DrawMode.OwnerDrawFixed;list.ItemHeight=64;list.IntegralHeight=false;list.DrawItem+=DrawLevelItem;}
 
-        LoadModeSetup();BuildHome();BuildEditor();BuildGames();BuildCoop();BuildBossPreparation();BuildNotes();
+        LoadModeSetup();BuildHome();BuildEditor();BuildGames();BuildCoop();BuildBossPreparation();BuildNotes();BuildBonusThumbnails();
 
         RefreshLevels();RefreshGames();
 

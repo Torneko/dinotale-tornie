@@ -379,7 +379,7 @@
  L_8057D81C:
      // 0x8057D81C: andi        $t6, $s1, 0x1
      ctx->r14 = ctx->r17 & 0X1;
-+    if(workshop_selection_unknown0355((unsigned)ctx->r16))ctx->r14=1;
++    if(workshop_selection_unknown0355((unsigned)ctx->r16))ctx->r14=0;
      // 0x8057D820: beq         $t6, $zero, L_8057D8A4
      if (ctx->r14 == 0) {
          // 0x8057D824: slti        $at, $s0, 0xE

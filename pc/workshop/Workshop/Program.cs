@@ -10,6 +10,12 @@ static class Program {
 
     [STAThread] static void Main(string[] args) {
 
+        int bonusCheck=Array.IndexOf(args,"--bonus-thumbnail-normalizer-check");
+        if(bonusCheck>=0){
+            try{if(bonusCheck+1>=args.Length)throw new ArgumentException("A new isolated output directory is required.");BonusThumbnailSelfChecks0358.Run(args[bonusCheck+1]);}
+            catch(Exception e){Console.Error.WriteLine(e);Environment.ExitCode=1;}return;
+        }
+
         ApplicationConfiguration.Initialize();
 
         var directory=new DirectoryInfo(AppContext.BaseDirectory);
@@ -78,7 +84,7 @@ static class Program {
 
                 var names=form.SectionNames;
 
-                if(names.Length!=6 || form.ClientSize.Width<900 || form.ClientSize.Height<600)throw new InvalidOperationException("Fenêtre initiale invalide.");
+                if(names.Length!=7 || form.ClientSize.Width<900 || form.ClientSize.Height<600)throw new InvalidOperationException("Fenêtre initiale invalide.");
 
                 Directory.CreateDirectory(Path.Combine(root,"build"));
 
