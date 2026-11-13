@@ -47,7 +47,7 @@ inline bool ordinary_shape(const core::Encounter& e){
  }
 }
 struct Cache {
- uint32_t registry_table=0,entry=0,wrapper=0,header=0,table=0;unsigned count=0;
+ uint32_t registry_table=0,entry=0,wrapper=0,header=0,table=0;unsigned count=0,native_source=177;
  bool operator==(const Cache&)const=default;
 };
 struct Placement {uint32_t record=0,packed=0,x=0,y=0;};
@@ -60,8 +60,8 @@ struct Receipt {unsigned room=177,index=10,epoch=0,vi=0,count=0;uint32_t cache=0
 inline bool aligned(uint32_t a,size_t size){return !(a&3)&&n::range(a,size);}
 // Mirrors6D6F8/57A28/6D6E4, with bounded pointer validation before a call
 // to the actual native getter. The11-slot registry is not actor teardown.
-inline bool lookup(uint8_t* r,unsigned source,Cache& out){
- auto* rdram=r;
+inline bool lookup(uint8_t* r,unsigned source,Cache& out,bool* absent=nullptr){
+ if(absent)*absent=false;auto* rdram=r;
  if(!r||source>=177||MEM_HU(8,n::base(0x800F8440))!=11)return false;
  const auto table=n::word(r,0x800F8450);if(!aligned(table,44))return false;
  unsigned found=0;Cache value{};
@@ -71,9 +71,9 @@ inline bool lookup(uint8_t* r,unsigned source,Cache& out){
   const auto header=n::word(r,wrapper);if(!aligned(header,8))return false;
   const auto count=MEM_HU(0,n::base(header));const auto objects=n::word(r,header+4);
   if(!count||count>149||!aligned(objects,0x960))return false;
-  value={table,entry,wrapper,header,objects,count};
+  value={table,entry,wrapper,header,objects,count,source};
  }
- if(found!=1)return false;out=value;return true;
+ if(found!=1){if(absent&&found==0)*absent=true;return false;}out=value;return true;
 }
 inline bool owned(const rooms::Arena& a,const core::Encounter& e,unsigned index){
  if(index>=10||a.source!=rooms::source_for_encounter(index)||a.native_init!=0x01000000||e.number!=index+1||!e.count||e.count>4||a.boss_indices.size()!=e.count||a.objects.empty()||a.objects.size()%12||a.objects.size()/12>149)return false;
@@ -116,7 +116,14 @@ public:
   if(!r||!c||epoch!=epoch_||!owned(a,e,index)||uint32_t(c->r31)!=0x8005A050)return reject("capture_scope");
   const auto actor=uint32_t(c->r4),record=uint32_t(c->r5);
   if(!aligned(record,16)||!capture_kind(e,uint16_t(n::word(r,record)>>16))||!n::actor(r,actor,uint16_t(n::word(r,record)>>16))||!aligned(n::word(r,actor+0x168),0x50))return reject("capture_actor");
-  Cache cache;if(!lookup(r,a.source,cache)||!native_table(r,cache,a))return reject("capture_cache");
+  Cache cache;bool canonical_absent=false;
+  if(!lookup(r,a.source,cache,&canonical_absent)||!native_table(r,cache,a)){
+   // The initial normal launch requests native52; only the HOST presentation
+   // aliases that scene to firstCandy162.6DA0C publishes raw52 at6DAD4 before
+   // any5A048->48E9C birth. It is not an absent/unfinished cache: attest the
+   // unique raw52 table, only for the exact first encounter at epoch0.
+   if(index!=0||epoch!=0||a.source!=162||!canonical_absent||!lookup(r,52,cache)||!native_table(r,cache,a))return reject("capture_cache");
+  }
   bool matched=false;for(unsigned m=0;m<e.count;++m){const auto offset=size_t(a.boss_indices[m])*12;
    if(record==cache.table+uint32_t(a.boss_indices[m])*16&&n::word(r,record)==u32(a.objects,offset))matched=true;
   }
@@ -146,13 +153,25 @@ public:
   if(!r||!c||!owned(a,e,f.index)||f.epoch!=epoch_||saved.pending_epoch!=f.epoch||saved.source!=f.room||a.source!=f.room||saved.count!=e.count||!f.vi||
      (f.phase!=core::Phase::ToFight&&f.phase!=core::Phase::RetryToFight)||uint32_t(c->r31)!=0x8006DDFC||(uint32_t(c->r5)&255)!=f.room||!aligned(uint32_t(c->r4),0x128))return reject("restore_fence");
   const auto stack=uint32_t(c->r29);if(stack<0x80000800||!aligned(stack-0x200,0x220))return reject("restore_stack");
-  Cache cache;if(!lookup(r,f.room,cache)||cache!=saved.cache||!native_table(r,cache,a)||!retired_links(r,saved))return reject("restore_cache_or_live_actor");
-  recomp_context work=*c;work.r29=n::base(stack-0x100);work.r4=f.room;dispatch(0x8006D6F8,r,&work);
+  const auto key=saved.cache.native_source;
+  const bool bootstrap=key==52&&f.index==0&&f.room==162;
+  if(key!=f.room&&!bootstrap)return reject("restore_cache_key");
+  Cache cache;if(!lookup(r,key,cache)||cache!=saved.cache||!native_table(r,cache,a)||!retired_links(r,saved))return reject("restore_cache_or_live_actor");
+  recomp_context work=*c;work.r29=n::base(stack-0x100);work.r4=key;dispatch(0x8006D6F8,r,&work);
   if(uint32_t(work.r2)!=cache.entry)return reject("native_cache_getter");
   // Global preflight again after the native read, before the first setter.
-  Cache again;if(!lookup(r,f.room,again)||again!=cache||!native_table(r,cache,a)||!retired_links(r,saved))return reject("restore_preflight");
+  Cache again;if(!lookup(r,key,again)||again!=cache||!native_table(r,cache,a)||!retired_links(r,saved))return reject("restore_preflight");
   for(unsigned m=0;m<e.count;++m){const auto& p=saved.placements[m];const auto at=size_t(a.boss_indices[m])*12;
    if(p.record!=cache.table+uint32_t(a.boss_indices[m])*16||p.packed!=u32(a.objects,at)||p.x!=u32(a.objects,at+4)||p.y!=u32(a.objects,at+8))return reject("restore_pristine_identity");
+  }
+  if(bootstrap){
+   // CP0 routes explicitly to162, never to the bootstrap raw52 alias. Only
+   // a proved cache MISS may hand this obsolete capture to the real cold
+   // 6DA0C/6D85C load. No placement setter runs; birth in that new canonical
+   // cache must capture again. Warm162 and every later death stay strict.
+   bool absent=false;Cache canonical;
+   if(lookup(r,f.room,canonical,&absent)||!absent)return reject("restore_bootstrap_not_cold");
+   saved={};return true;
   }
   unsigned count=0;for(unsigned m=0;m<saved.count;++m){const auto& p=saved.placements[m];if(n::word(r,p.record)==0xFFFFFFFF){work=*c;work.r29=n::base(stack-0x100);work.r4=n::base(p.record);work.r5=n::base(p.packed);dispatch(0x8006D34C,r,&work);++count;}}
   for(unsigned m=0;m<saved.count;++m){const auto& p=saved.placements[m];if(n::word(r,p.record)!=p.packed||n::word(r,p.record+4)!=p.x||n::word(r,p.record+8)!=p.y)return reject("native_placement_readback");}

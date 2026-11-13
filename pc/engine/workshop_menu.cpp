@@ -27,6 +27,7 @@ extern "C" int workshop_battle_failed();
 #include "story_rights0320.hpp"
 #include "known_yoshis_runtime0355.hpp"
 #include "book_unlock_art0355.hpp"
+#include "yoshi_colors0300.hpp"
 #include "stb/stb_image.h"
 #include "hybrid_finds.hpp"
 #include "story_hard_bridge0330.hpp"
@@ -776,11 +777,12 @@ void creation(){
 }
 
 void boss_battle(){
+    const unsigned challenge_count=workshop::yoshi_colors0300::total;
     std::string challenge_text;
 #ifdef WORKSHOP_NATIVE_COOP
-    const auto mask=workshop_battle_challenges();challenge_text=tr("Défis remportés : ","Challenges won: ")+std::to_string(std::popcount(mask))+" / 18\n\n";
+    const auto mask=workshop_battle_challenges();challenge_text=tr("Défis remportés : ","Challenges won: ")+std::to_string(std::popcount(mask))+" / "+std::to_string(challenge_count)+"\n\n";
     if(!workshop_battle_challenge_readable())challenge_text+=tr("Le fichier des défis est illisible. Il est conservé ; les nouveaux résultats ne peuvent pas être enregistrés.\n\n","The challenge file cannot be read. It has been preserved; new results cannot be saved.\n\n");
-    for(unsigned color=0;color<18;++color){challenge_text+=(mask&(1u<<color))?"[x] ":"[ ] ";if(!workshop::known_yoshis_runtime0355::snapshot().known(color))challenge_text+="???";else if(color==6)challenge_text+=tr("Blanc","White");else if(color==7)challenge_text+=tr("Noir","Black");else if(color<14){const auto& id=workshop::coop_health0250::identities[color];challenge_text+=french?id.french:id.english;}else challenge_text+=color==14?tr("Or","Gold"):color==15?tr("Argent","Silver"):color==16?tr("Feu/lave","Fire/Lava"):tr("Eau/glace","Water/Ice");challenge_text+=color%2?"\n":" | ";}
+    for(unsigned color=0;color<challenge_count;++color){challenge_text+=(mask&(1u<<color))?"[x] ":"[ ] ";if(!workshop::known_yoshis_runtime0355::snapshot().known(color))challenge_text+="???";else if(color==6)challenge_text+=tr("Blanc","White");else if(color==7)challenge_text+=tr("Noir","Black");else if(color<14){const auto& id=workshop::coop_health0250::identities[color];challenge_text+=french?id.french:id.english;}else challenge_text+=color==14?tr("Or","Gold"):color==15?tr("Argent","Silver"):color==16?tr("Feu/lave","Fire/Lava"):tr("Eau/glace","Water/Ice");challenge_text+=color%2?"\n":" | ";}
 #endif
     panel("Boss Battle",tr("Dix combats, un Yoshi. Les prochains boss restent cachés.\n\nAu repos : Lucky Tree, bloc d’œufs et pot vers le combat suivant. L’arbre garde les fruits consommés et dispose de deux régénérations par session.\n\nAprès les boss 3, 6 et 9, réveille le personnage numéroté : après une défaite, le même Yoshi reprend avec la vie et les œufs enregistrés. Un grand cœur à usage unique apparaît après le cinquième boss.","Ten battles, one Yoshi. Upcoming bosses stay hidden.\n\nAt each rest stop: Lucky Tree, egg block and pot to the next fight. The tree remembers consumed fruit and has two regenerations per session.\n\nAfter bosses 3, 6 and 9, wake the numbered character: after a defeat, the same Yoshi returns with the saved health and eggs. A one-use big heart appears after the fifth boss."));
 #ifdef WORKSHOP_NATIVE_COOP
@@ -788,7 +790,7 @@ void boss_battle(){
 #else
     action(0,tr("Mode indisponible dans cette version","Mode unavailable in this build"),[]{panel("Boss Battle",tr("Cette version ne contient pas les combats natifs.","This build does not include native boss encounters."));back();});
 #endif
-    action(1,tr("Défis par Yoshi","Yoshi challenges"),[challenge_text]{panel(tr("Les 14 défis","The 14 challenges"),challenge_text);action(0,tr("Retour","Back"),boss_battle);});back(2);
+    action(1,tr("Défis par Yoshi","Yoshi challenges"),[challenge_text,challenge_count]{panel(tr("Les ","The ")+std::to_string(challenge_count)+tr(" défis"," challenges"),challenge_text);action(0,tr("Retour","Back"),boss_battle);});back(2);
 }
 
 void statistics();

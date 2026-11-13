@@ -120,6 +120,13 @@
   "renewableEnemyScoreSuppressed": true,
   "storyHardElementalPrerequisite": false,
   "personalProfileInstalled": false,
+  "privateRevision": "0355-retry2",
+  "bossCheckpointOrdinaryPlacementReplay": true,
+  "bossCheckpointChainedRetryReplay": true,
+  "bossInitialRaw52CacheVerified": true,
+  "bossCheckpoint0Cold162TransitionVerified": true,
+  "bossChallengeTitleUsesCatalogCount": true,
+  "bossChallengeCount": 18,
   "platform": "build-time",
-  "validationScope": "Source capability contract; each build requires its own evidence. No gameplay certification."
+  "validationScope": "Source capability contract; actual build and gameplay require their own evidence."
 }
