@@ -57,6 +57,25 @@ jobs:
       - name: Install controlled Ubuntu build dependencies and SDL2.30.3
         shell: bash
         run: bash pc/scripts/ci/setup-linux0355.sh
+      - name: Targeted0355 POSIX persistence proof
+        shell: bash
+        run: python3 pc/scripts/ci/posix0355.py
+      - name: Verify Bonus shell launcher using disposable fake processes only
+        shell: bash
+        run: python3 pc/scripts/verify-linux-bonus-launcher0355.py
+      - name: Install pinned .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.300
+      - name: Publish actual0355 Linux Workshop
+        shell: bash
+        run: python3 pc/scripts/publish-workshop-linux-ci0355.py --publish-go
+      - name: Verify headless Workshop APIs and qualify exact manifest
+        shell: bash
+        run: |
+          python3 pc/scripts/verify-linux-atelier0355.py \
+            --app pc/build/workshop-linux0355/YoshiStory-AtelierLinux \
+            --record-qualified-manifest
       - name: Fetch reviewed ciphertext-only orphan commit (read only)
         shell: bash
         run: |
@@ -86,25 +105,6 @@ jobs:
           python3 pc/scripts/ci/build-native0355.py \
             --private-inputs pc/build/linux-mint-0355/private-inputs \
             --source-commit "$SOURCE_COMMIT"
-      - name: Targeted0355 POSIX persistence proof
-        shell: bash
-        run: python3 pc/scripts/ci/posix0355.py
-      - name: Verify Bonus shell launcher using disposable fake processes only
-        shell: bash
-        run: python3 pc/scripts/verify-linux-bonus-launcher0355.py
-      - name: Install pinned .NET SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 9.0.300
-      - name: Publish actual0355 Linux Workshop
-        shell: bash
-        run: python3 pc/scripts/publish-workshop-linux-ci0355.py --publish-go
-      - name: Verify headless Workshop APIs and qualify exact manifest
-        shell: bash
-        run: |
-          python3 pc/scripts/verify-linux-atelier0355.py \
-            --app pc/build/workshop-linux0355/YoshiStory-AtelierLinux \
-            --record-qualified-manifest
       - name: Stage factory blank seed and public BPS inputs
         shell: bash
         run: |
