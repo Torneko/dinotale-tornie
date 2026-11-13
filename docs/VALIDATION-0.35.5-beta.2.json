@@ -1,0 +1,61 @@
+{
+  "version": "0.35.5-beta.2",
+  "engineVersion": "0.35.5",
+  "candidateOnly": true,
+  "stableGameplayCertified": false,
+  "linuxBinaryCompileSourceCommit": "9c5409ab939ad4650503617dd719129347514a67",
+  "linuxWorkflowRun": "https://github.com/Torneko/dinotale-tornie/actions/runs/43451362324",
+  "windows": {
+    "engineSha256": "73afeda9e9061698d821bca19c6ac42380faee35975b9bcd92a33a107f8747cf",
+    "workerSha256": "2b7498e161eaa5638321c07e36a433477335f202335f7e23f48efedffe8e55e6",
+    "workshopSha256": "16309cd944ca68410fe50b3dc7bf07e197d8151824e3ffb549ca29ff1c4e10dc",
+    "sharedQualifiedSourceParityCount": 371,
+    "newManualGameplayCertified": false,
+    "packageArchiveVerified": true
+  },
+  "linux": {
+    "engineSha256": "72cf0616203db057d8674f7e8dee0cc257b7d40beb7e6d74a9dd5e503f0e82f4",
+    "nativeBuildVerified": true,
+    "thumbnailStorageChecks": 105,
+    "thumbnailInterfaceChecks": 667,
+    "thumbnailApiChecks": 74,
+    "thumbnailApiRequests": 36,
+    "archiveFileCount": 80,
+    "inputCandidateSha256": "a9f72e5905bb299cacb93f62e0639fc6e3292c6ece33a33079bbab8480382e8d",
+    "candidateArchiveAuditPassed": true,
+    "freshRomBackedAudioRenderVerified": false,
+    "gameGpuOrAudioDeviceExecuted": false,
+    "physicalLinuxMint22_3GameplayVerified": false,
+    "earlierUserLinuxFeedbackVersion": "0.34.0-beta.1"
+  },
+  "distributionPolicy": {
+    "romIncluded": false,
+    "preparedContentIncluded": false,
+    "personalProgressIncluded": false,
+    "freshSave": true,
+    "initialCurrency": 0,
+    "initialVolumePercent": 3,
+    "testUnlocksForced": false,
+    "coopAndBossBattleIncomplete": true,
+    "originalRomRequired": true
+  },
+  "limits": [
+    "Natural playthrough and visual checks remain pending.",
+    "Co-op and Boss Battle remain unfinished.",
+    "Bonus screenshots are not supplied and public acceptance remains gated.",
+    "Physical Linux Mint gameplay, GPU and audio validation remain pending."
+  ],
+  "publicArchives": {
+    "DinoTale-Tornie-0.35.5-beta.2-Windows-x64.zip": {
+      "sha256": "b6320d39d0b0220caf0371e2295dcc269fdb80721c3eddffe853686a7be8603d",
+      "bytes": 79614198,
+      "files": 113,
+      "packageChecks": 241
+    },
+    "DinoTale-Tornie-0.35.5-beta.2-Linux-x64.tar.gz": {
+      "sha256": "434293b7a4380e5560326ca5c6abf330484b72aaf8af0b3abb0b9013e207e2e4",
+      "bytes": 62090693,
+      "files": 80
+    }
+  }
+}

@@ -1,11 +1,11 @@
-# Building DinoTale Tornie 0.35.5-beta.1
+# Building DinoTale Tornie 0.35.5-beta.2
 
 Use a dedicated development checkout. The public tree contains no original ROM, prepared game image, complete generated game functions, generated RSP source, personal progression or private cache. The source archive accompanies both testing downloads; its dependency manifest records all pinned libraries. Compiler and SDK changes can produce different executable bytes.
 
 ## Checkout and dependencies
 
 ```sh
-git clone --recurse-submodules --branch v0.35.5-beta.1 https://github.com/Torneko/dinotale-tornie.git
+git clone --recurse-submodules --branch v0.35.5-beta.2 https://github.com/Torneko/dinotale-tornie.git
 cd dinotale-tornie
 ```
 

@@ -4,7 +4,7 @@ Un projet PC dérivé de [DinoTale](https://github.com/wootbeer/dinotale), imagi
 
 **Bêta 0.35.5 : Windows x64 et Linux x64 expérimental.** Les ajouts solo et l’Atelier sont disponibles pour les essais. La coop et le mode Boss restent en développement et incomplets. Les nouvelles campagnes et les interactions de jeu demandent encore des essais humains.
 
-[Guide français](https://torneko.github.io/dinotale-tornie/) · [English guide](https://torneko.github.io/dinotale-tornie/index-en.html) · [Téléchargements / Downloads](https://github.com/Torneko/dinotale-tornie/releases/tag/v0.35.5-beta.1)
+[Guide français](https://torneko.github.io/dinotale-tornie/) · [English guide](https://torneko.github.io/dinotale-tornie/index-en.html) · [Téléchargements / Downloads](https://github.com/Torneko/dinotale-tornie/releases/tag/v0.35.5-beta.2)
 
 ## Jouer / Play
 
@@ -28,6 +28,7 @@ Before updating, close the game and keep a complete backup of the previous folde
 
 ## Nouveautés / Changes
 
+- Bêta 2 : sélection plus discrète, import des vignettes Bonus et corrections ciblées de reprises et de terrain. / Beta 2: a quieter selection screen, Bonus thumbnail imports and focused recovery and arena fixes.
 - Nouvelles découvertes et récompenses pour les modes solo. / Additional discoveries and rewards for solo modes.
 - Menus qui préservent les surprises et suivis de progression enrichis. / Menus that preserve surprises and expanded progression tracking.
 - Atelier avec davantage d’objets, de fruits, de passages et de possibilités de création. / Workshop improvements for objects, fruit, passages and level creation.
@@ -37,9 +38,9 @@ Le guide propose une section détaillée avec avertissement avant de révéler l
 
 ## Sources
 
-[Build instructions](BUILDING.md) · [Notes 0.35.5-beta.1](docs/RELEASE-0.35.5-beta.1.md) · [Credits](CREDITS.md)
+[Build instructions](BUILDING.md) · [Notes 0.35.5-beta.2](docs/RELEASE-0.35.5-beta.2.md) · [Credits](CREDITS.md)
 
-The engine and Workshop use version 0.35.5 on both platforms. Package version 0.35.5-beta.1 identifies the public testing distribution; it is not a stable-gameplay certification. Platform-specific verification and pending checks are recorded with the release.
+The engine and Workshop use version 0.35.5 on both platforms. Package version 0.35.5-beta.2 identifies the public testing distribution; it is not a stable-gameplay certification. Platform-specific verification and pending checks are recorded with the release.
 
 `pc/engine` contains the native additions. `pc/workshop` contains the .NET editor and local ROM importer. `pc/dinotale` retains upstream sources and local changes, with pinned libraries. `pc/recompile` and `pc/distribution` contain source metadata and incremental patches. Complete generated game C, RSP output, original/prepared game images, personal data and private build caches remain outside the public tree. The source archive exports only its tagged source tree, with dependency pins; it does not contain Git history or encrypted build inputs.
 

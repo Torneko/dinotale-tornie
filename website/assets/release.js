@@ -1,5 +1,5 @@
 (()=>{
-  const release=window.DINOTALE_RELEASE={version:"0.35.5-beta.1",available:true,prerelease:true,linuxExperimental:true};
+  const release=window.DINOTALE_RELEASE={version:"0.35.5-beta.2",available:true,prerelease:true,linuxExperimental:true};
   const en=document.documentElement.lang==='en',target=document.querySelector('#release-downloads');
   if(!target)return;
   const base='https://github.com/Torneko/dinotale-tornie/releases/download/v'+release.version+'/';
