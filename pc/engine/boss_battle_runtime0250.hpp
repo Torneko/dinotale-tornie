@@ -149,11 +149,23 @@ inline void trace_missing_controls(uint8_t* rdram){
  const auto& s=session.snapshot();fprintf(stderr,"[BossControlsBaseline] room=%u logical=%u encounter=%u epoch=%u variantEpoch=%u player=%08X flags=%u,%u defeated=%u vi=%u witness=%u\n",physical_room,logical_room,s.index,s.retry_epoch,variant_epoch,s.player,native::byte(rdram,0x800F7EA5),native::byte(rdram,0x800F7EA6),unsigned(s.defeated),current_vi,unsigned(witnessed_zero_controls(rdram,s.player)));
  for(unsigned n=0;n<session.current().count&&n<4;++n)if(session.current().members[n].kind==0x455A){const char* why=nullptr;const bool live=candy_live_zero_controls(rdram,n,&why);const auto& p=candies[n].snapshot();const auto& a=p.actors[0];fprintf(stderr,"[BossControlsCandy] member=%u root=%08X birth=%llu observerEpoch=%u enabled=%u invalid=%u active=%u count=%d hits=%u complete=%u disposed=%u live=%u why=%s\n",n,bound[n],static_cast<unsigned long long>(variants::snapshot().members[n].birth),observer_epochs[n],unsigned(p.enabled),unsigned(p.invalidated),unsigned(a.active_seen),a.counter,a.causal_hits,unsigned(a.completion_returned),unsigned(a.disposed),unsigned(live),why?why:"unknown");}
 }
+// The last Fish member must keep its own native identity after its companion
+// has delivered a defeat receipt. A defeated companion cannot prove controls.
+inline bool fish_survivor_zero_controls(uint8_t* ram){
+ const auto& s=session.snapshot();const auto& e=session.current();const auto& v=variants::snapshot();
+ if(!ram||s.phase!=core::Phase::Fighting||e.family!=core::Family::Fish||e.variant!=2||!core::valid_fish(e)||s.index<1||s.index>8||physical_room!=167+s.index||logical_room!=97||s.defeated!=2||variant_epoch!=s.retry_epoch||observer_epochs[1]!=s.retry_epoch||!v.enabled||v.invalidated||v.encounter!=s.index||v.room!=97)return false;
+ const auto& b=v.members[0];const auto& dead=v.members[1];const auto a=bound[0],overlay=overlays[148];
+ if(!a||a!=b.actor||!b.birth||!b.initialized||!b.active||!b.remaining||b.terminal_requested||b.terminal||b.receipt_sent||b.retire_queued||dead.actor!=bound[1]||!dead.birth||!dead.terminal||!dead.receipt_sent||!variants::fish_contact_ready(ram,0)||!native::range(overlay,0x3FF0))return false;
+ const auto sub=native::byte(ram,a+0x30),resource=native::word(ram,a+0x168);
+ if(sub>=boss_fish_companion_intro0260::fish_callbacks.size()||!boss_fish_companion_intro0260::fish_callbacks[sub]||!native::range(resource,0x48))return false;
+ return ((native::byte(ram,resource+0x3C)<<8)|native::byte(ram,resource+0x3D))==0x4511&&native::word(ram,resource+0x40)==overlay&&native::word(ram,resource+0x44)==overlay+0x35A8&&native::word(ram,a+0x20)==overlay+boss_fish_companion_intro0260::fish_callbacks[sub];
+}
 inline bool witnessed_zero_controls(uint8_t* rdram,uint32_t player){
  const auto& s=session.snapshot();const auto& v=variants::snapshot();
  if(!rdram||!active()||s.phase!=core::Phase::Fighting||player!=s.player||native::byte(rdram,0x800F7EA5)||native::byte(rdram,0x800F7EA6)||!witnesses::active_player(rdram,player)||native::word(rdram,0x800F8828)!=player||native::byte(rdram,player+0x17D)!=2||native::byte(rdram,player+0x165)||!native::byte(rdram,player+0x18)||native::byte(rdram,player+0x18)==0xFF)return false;
  const auto p=native::word(rdram,player+0x1F4);
  if(!native::range(p,0x12F0)||native::word(rdram,p+0x12EC)||!v.enabled||v.invalidated||v.encounter!=s.index||v.room!=logical_room||core::room(session.current().family)!=logical_room||variant_epoch!=s.retry_epoch)return false;
+ if(fish_survivor_zero_controls(rdram))return true;
  if(blargg_owned())for(unsigned n=0;n<2;++n)if(blargg_active_member(rdram,n))return true;
  for(unsigned n=0;n<session.current().count&&n<4;++n){
   const auto kind=session.current().members[n].kind;if(kind==0x455A){if(candy_live_zero_controls(rdram,n))return true;continue;}const auto family=witnesses::family_for_kind(kind);if(!family||(s.defeated&(1u<<n)))continue;

@@ -9,6 +9,7 @@ extern "C" int workshop_battle_diagnostic();
 extern "C" int workshop_battle_failed();
 #endif
 #include "workshop_menu.hpp"
+#include "save_erasure0375.hpp"
 
 #include "custom_session.hpp"
 
@@ -125,6 +126,8 @@ Label* resume_label=nullptr;
 bool loading_mode=false;
 
 bool resume_pending=false;
+bool erase_confirmation0375=false,erase_handoff0375=false;
+void options();void save_options0375();
 
 // Explicit ownership survives Options overlays and native paused snapshots
 // that lag one frame behind Resume. Workers never change this ownership.
@@ -407,7 +410,8 @@ protected:
 
         if(action==MenuAction::Back || action==MenuAction::Toggle){
 
-            if(detail_open)home();
+            if(erase_confirmation0375){erase_confirmation0375=false;save_options0375();}
+            else if(detail_open)home();
 
             else if(ultramodern::is_game_started())resume_game();
 
@@ -562,6 +566,18 @@ bool bonus_launch_authorized0353(){
     return workshop::bonus_game0352::preview_requested()||workshop::bonus_game0352::launch_requested();
 }
 
+bool prepare_erasure_handoff0375(unsigned pid){
+    if(!erase_handoff0375)return true;
+    try{
+        if(std::filesystem::weakly_canonical(recomp::get_config_path())!=std::filesystem::weakly_canonical(std::filesystem::current_path()))throw std::runtime_error("active-profile-mismatch");
+        std::string token(32,'0');std::random_device random;
+        for(auto& c:token)c="0123456789abcdef"[random()&15];
+        workshop::save_erasure0375::prepare(std::filesystem::current_path(),pid,token);return true;
+    }catch(const std::exception& e){
+        erase_handoff0375=false;loading_mode=false;fprintf(stderr,"[SaveErasure0375] request-failed=%s\n",e.what());
+        footer->set_text(tr("Effacement impossible. La sauvegarde est conservée.","Could not erase. The save has been preserved."));return false;
+    }
+}
 void route_native(int mode){
 
     loading_mode=true;resume_button->display_hide();
@@ -578,15 +594,15 @@ void route_native(int mode){
 
     auto deadline=SDL_GetTicks64()+2000;
 
-    while(!workshop::book::snapshot().paused && SDL_GetTicks64()<deadline)std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    while(ultramodern::is_game_started()&&!workshop::book::snapshot().paused && SDL_GetTicks64()<deadline)std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-    if(workshop::book::snapshot().paused){
+    if(!ultramodern::is_game_started()||workshop::book::snapshot().paused){
 
         // This API's worker barrier drains pending EEPROM writes before it
 
         // reopens the same file. No native game thread writes while parked.
 
-        ultramodern::change_save_file({},ultramodern::get_save_file_path().stem().u8string());
+        if(ultramodern::is_game_started())ultramodern::change_save_file({},ultramodern::get_save_file_path().stem().u8string());
 
         if(window){
 
@@ -603,12 +619,13 @@ void route_native(int mode){
             write_progress_summary0320();
 
             std::wstring command=L"\""+std::wstring(executable.data())+L"\" --workshop-wait-parent "+std::to_wstring(GetCurrentProcessId())+L" --workshop-main-menu"+(mode>=0?L" --workshop-start-mode "+std::to_wstring(mode):L"");
-            for(const auto& argument:bonus_launch_arguments0353(mode))command+=L" "+std::wstring(argument.begin(),argument.end());
+            if(!erase_handoff0375)for(const auto& argument:bonus_launch_arguments0353(mode))command+=L" "+std::wstring(argument.begin(),argument.end());
 
             STARTUPINFOW startup{};startup.cb=sizeof(startup);
 
             PROCESS_INFORMATION process{};
 
+            if(!prepare_erasure_handoff0375(GetCurrentProcessId()))return;
             if(CreateProcessW(executable.data(),command.data(),nullptr,nullptr,FALSE,0,nullptr,std::filesystem::current_path().c_str(),&startup,&process)){
 
                 fprintf(stderr,"[BookLink] handoff mode=%d parent=%lu child=%lu save-barrier=complete\n",mode,GetCurrentProcessId(),process.dwProcessId);fflush(stderr);
@@ -628,11 +645,11 @@ void route_native(int mode){
 
     auto deadline=SDL_GetTicks64()+2000;
 
-    while(!workshop::book::snapshot().paused && SDL_GetTicks64()<deadline)std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    while(ultramodern::is_game_started()&&!workshop::book::snapshot().paused && SDL_GetTicks64()<deadline)std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-    if(workshop::book::snapshot().paused){
+    if(!ultramodern::is_game_started()||workshop::book::snapshot().paused){
 
-        ultramodern::change_save_file({},ultramodern::get_save_file_path().stem().u8string());
+        if(ultramodern::is_game_started())ultramodern::change_save_file({},ultramodern::get_save_file_path().stem().u8string());
 
         if(window){
 
@@ -646,7 +663,8 @@ void route_native(int mode){
 
         std::vector<std::string> next_args{"--workshop-wait-parent",std::to_string(workshop::linux_process::id()),"--workshop-main-menu"};
         if(mode>=0){next_args.push_back("--workshop-start-mode");next_args.push_back(std::to_string(mode));}
-        const auto bonus_args=bonus_launch_arguments0353(mode);next_args.insert(next_args.end(),bonus_args.begin(),bonus_args.end());
+        const auto bonus_args=erase_handoff0375?std::vector<std::string>{}:bonus_launch_arguments0353(mode);next_args.insert(next_args.end(),bonus_args.begin(),bonus_args.end());
+        if(!prepare_erasure_handoff0375(workshop::linux_process::id()))return;
         if(workshop::linux_process::launch(workshop::linux_process::executable(),next_args,std::filesystem::current_path())){
 
             fprintf(stderr,"[BookLink] Linux handoff mode=%d parent=%u save-barrier=complete\n",mode,workshop::linux_process::id());fflush(stderr);
@@ -660,6 +678,16 @@ void route_native(int mode){
 
 #endif
 
+    if(erase_handoff0375){
+        try{
+#ifdef _WIN32
+            workshop::save_erasure0375::cancel(std::filesystem::current_path(),GetCurrentProcessId());
+#elif defined(__linux__)
+            workshop::save_erasure0375::cancel(std::filesystem::current_path(),workshop::linux_process::id());
+#endif
+        }catch(const std::exception& e){fprintf(stderr,"[SaveErasure0375] cancellation-failed=%s\n",e.what());}
+        erase_handoff0375=false;
+    }
     loading_mode=false;
 
     panel(tr("Mode indisponible","Mode unavailable"),tr("Le mode n’a pas pu être ouvert. Ta partie est toujours en pause.","The mode could not be opened. Your game is still paused."));
@@ -1197,7 +1225,8 @@ void options(){
 
     });
 
-    action(1,tr("Réglages du jeu","Game settings"),[]{recompui::config::open();});back(2);
+    action(1,tr("Réglages du jeu","Game settings"),[]{recompui::config::open();});
+    action(2,tr("Sauvegarde et retour","Save and return"),save_options0375);
     action(3,purchase_sound?tr("Son des achats : activé","Purchase sounds: on"):tr("Son des achats : désactivé","Purchase sounds: off"),[]{
         if(save_menu_preferences(french,!purchase_sound))purchase_sound=!purchase_sound;
         options();
@@ -1206,6 +1235,21 @@ void options(){
 }
 
 
+void confirm_save_erasure0375(){
+    erase_confirmation0375=true;
+    panel(tr("Effacer la sauvegarde ?","Erase save data?"),tr(
+        "Toutes les parties, les records, les monnaies, les Yoshis débloqués et les tentatives de ce profil seront effacés. Cette suppression est irréversible : tu ne pourras pas revenir en arrière.\n\nLa ROM, les créations et les réglages seront conservés. DinoTale redémarrera avec une partie vierge.",
+        "All runs, records, currencies, unlocked Yoshis and attempts in this profile will be erased. This deletion is irreversible: you cannot go back.\n\nYour ROM, creations and settings will be kept. DinoTale will restart with a fresh save."));
+    action(0,tr("Annuler","Cancel"),[]{erase_confirmation0375=false;save_options0375();});
+    action(1,tr("Effacer définitivement","Erase permanently"),[]{erase_confirmation0375=false;erase_handoff0375=true;route_native(-1);});
+}
+void save_options0375(){
+    erase_confirmation0375=false;
+    panel(tr("Sauvegarde","Save data"),tr("Tu peux effacer la progression du profil actif. Une confirmation sera demandée avant toute suppression.","You can erase progress in the active profile. Confirmation is required before anything is deleted."));
+    action(0,tr("Retour aux Options","Back to Options"),options);
+    action(1,tr("Effacer ma sauvegarde…","Erase my save…"),confirm_save_erasure0375);
+    back(2);
+}
 void trial_modes0352(){
     panel(tr("Trial","Trial"),tr("Rejoue les niveaux classiques ou découvre les six niveaux bonus associés aux pages du livre.","Replay classic courses or discover the six bonus courses associated with the book pages."));
     action(0,tr("Trial classique","Classic Trial"),[]{launch_native(1);});

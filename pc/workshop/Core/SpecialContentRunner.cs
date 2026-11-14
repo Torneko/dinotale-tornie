@@ -234,6 +234,8 @@ public static class SpecialSaveSeed {
         }
     }
     public static bool Initialize(string root,string profile){
+        // An explicit erasure is never seeded from an import or another profile.
+        if(File.Exists(Path.Combine(profile,"save-erased0375.txt"))||Directory.Exists(Path.Combine(profile,"save-erased0375.txt")))return false;
         string target=Path.Combine(profile,"saves","yoshisstory.n64.us.bin");
         string personalDirectory=Path.Combine(root,"profiles","content-personal");
         if(File.Exists(target)){CopyMissingNewJournals(personalDirectory,profile);return false;}

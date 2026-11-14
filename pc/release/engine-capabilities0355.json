@@ -120,7 +120,7 @@
   "renewableEnemyScoreSuppressed": true,
   "storyHardElementalPrerequisite": false,
   "personalProfileInstalled": false,
-  "privateRevision": "0355-egglift1",
+  "privateRevision": "0355-saveerase1",
   "bossCheckpointOrdinaryPlacementReplay": true,
   "bossCheckpointChainedRetryReplay": true,
   "bossInitialRaw52CacheVerified": true,
@@ -154,5 +154,9 @@
   "storyHardBubbleDependenciesPreloaded": true,
   "storyHardClosedBubblesKeepNativeMystery": true,
   "storyHardAddedEggSourcesRaised64": true,
-  "storyHardConstrainedEggColumnsCentered": true
+  "storyHardConstrainedEggColumnsCentered": true,
+  "fishSurvivorBirdSupply0372": true,
+  "fishSurvivorCullBounds0372": true,
+  "bossDisposedActorDiagnostic0372": true,
+  "confirmedActiveProfileSaveErasure0375": true
 }

@@ -57,6 +57,17 @@ jobs:
       - name: Install controlled Ubuntu build dependencies and SDL2.30.3
         shell: bash
         run: bash pc/scripts/ci/setup-linux0355.sh
+      - name: Verify confirmed save erasure with actual portable193-check fixture
+        shell: bash
+        run: python3 pc/scripts/ci/verify-save-erasure0375.py --run
+      - name: Upload standalone portable save erasure proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux0375-save-erasure-${{ inputs.source_commit }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: pc/build/save-erasure0375/linux-cpu-*/verification.json
       - name: Targeted0355 POSIX persistence proof
         shell: bash
         run: python3 pc/scripts/ci/posix0355.py

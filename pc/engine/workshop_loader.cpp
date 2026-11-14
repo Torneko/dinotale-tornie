@@ -1,4 +1,5 @@
 #include "workshop_loader.hpp"
+#include "save_erasure0375.hpp"
 #include "boss_manual_handoff0260.hpp"
 #include "custom_session.hpp"
 extern "C" void workshop_request_native_history_test(unsigned);
@@ -2500,6 +2501,11 @@ extern "C" void workshop_80000438(uint8_t* rdram,recomp_context* ctx) {
 
 bool workshop_configure(int& argc, char** argv) {
     try {
+        if(workshop::save_erasure0375::finish_after_parent(std::filesystem::current_path(),[](unsigned pid){return workshop_menu_wait_parent(pid);})){
+            // A reset always returns to the book; inherit no old run/diagnostic flags.
+            argc=1;workshop_menu_enable();
+            fprintf(stderr,"[SaveErasure0375] active-profile-erased before-journals-and-native-save-worker=1\n");
+        }
 #ifdef WORKSHOP_CONTENT_BUILD
         configure_diagnostics();
 #endif

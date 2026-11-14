@@ -134,7 +134,7 @@ inline std::optional<boss_fish_purple0260::Frame> purple_frame(uint8_t* rdram,ui
 // Keep the shared resourceB intact: only this live campaign generation owns
 // these four actor bytes. Revalidate every guard before either halfword write.
 inline bool preserve_fish_bounds(uint8_t* rdram,unsigned n,uint64_t birth,const Frame& f){
- if(!rdram||!state.enabled||state.invalidated||encounter.family!=battle::Family::Fish||!f.combat_active||f.room!=state.room||byte(rdram,0x800F7EA6)!=1||n>=encounter.count)return false;
+ if(!rdram||!state.enabled||state.invalidated||encounter.family!=battle::Family::Fish||!f.combat_active||f.room!=state.room||!admitted_controls(rdram,f)||n>=encounter.count)return false;
  const auto& member=encounter.members[n];const auto& b=state.members[n];
  if(member.kind!=red_fish||!birth||b.birth!=birth||!b.initialized||b.terminal_requested||b.terminal||b.receipt_sent||b.retire_queued||!b.remaining||!live(rdram,n)||byte(rdram,b.actor+0x17D)!=2||byte(rdram,b.actor+0x18)!=1)return false;
  MEM_H(0xC0,boss_native::base(b.actor))=0x7FFF;
@@ -146,7 +146,7 @@ inline bool preserve_fish_visibility(uint8_t* rdram,uint32_t a,const Frame& f){
 }
 inline void forget(uint32_t a){
  pulses.erase(a);candy_children.erase(a);for(auto& b:state.members)if(a&&b.fire_generator==a){b.fire_generator=b.fire_private=0;b.fire_streaming=b.fire_pending=false;}for(auto& bird:birds){if(a&&bird.source_actor==a){bird.source_actor=bird.source_private=0;bird.source_birth=0;}if(a&&bird.actor==a){bird.actor=bird.private_data=bird.resource=bird.factory=bird.source_actor=bird.source_private=bird.injury_stack=0;bird.source_birth=bird.injury_birth=0;bird.injury_queued=false;bird.next_tick=state.active_ticks+ticks(encounter.bird_respawn_ms);bird.pending=false;}}
- for(auto& b:state.members)if(a&&b.actor==a&&!b.terminal){fail("variant_actor_disposed_or_reused");return;}
+ for(unsigned member=0;member<state.members.size();++member){const auto& b=state.members[member];if(a&&b.actor==a&&!b.terminal){if(!state.invalidated)std::fprintf(stderr,"[BossMemberDisposed] encounter=%u member=%u actor=%08X expectedKind=%04X remaining=%u hits=%u birth=%llu hostObservation=1\n",state.encounter,member,a,unsigned(encounter.members[member].kind),b.remaining,b.hits,(unsigned long long)b.birth);fail("variant_actor_disposed_or_reused");return;}}
 }
 inline void created(uint32_t a){forget(a);}
 inline bool pulse(uint8_t* rdram,uint32_t a){
